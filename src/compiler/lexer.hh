@@ -2,13 +2,7 @@
 
 #include "utf32.hh"
 
-enum token {
-    IDENTIFIER,
-    KW_IF,
-    KW_ELSE,
-    KW_TRUE,
-    KW_FALSE,
-};
+#include <tokens.h>
 
 class lexer {
     utf32::stream stream;
