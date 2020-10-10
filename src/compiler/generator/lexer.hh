@@ -20,12 +20,50 @@ class ast_char : public ast {
     virtual std::ostream &print(std::ostream &stream);
 };
 
-class ast_seq : public ast {
-    std::vector<std::unique_ptr<ast>> children;
+enum regex_class {
+    WORD,
+    DIGIT,
+    SPACE,
+    NOT_WORD,
+    NOT_DIGIT,
+    NOT_SPACE,
+};
+
+class ast_class : public ast {
+    regex_class cls;
 
    public:
-    ast_seq(std::vector<std::unique_ptr<ast>> children);
-    virtual ~ast_seq();
+    ast_class(regex_class cls);
+    virtual ~ast_class();
+    virtual std::ostream &print(std::ostream &stream);
+};
+
+class ast_concat : public ast {
+    std::unique_ptr<ast> child_a;
+    std::unique_ptr<ast> child_b;
+
+   public:
+    ast_concat(std::unique_ptr<ast> child_a, std::unique_ptr<ast> child_b);
+    virtual ~ast_concat();
+    virtual std::ostream &print(std::ostream &stream);
+};
+
+class ast_alt : public ast {
+    std::unique_ptr<ast> child_a;
+    std::unique_ptr<ast> child_b;
+
+   public:
+    ast_alt(std::unique_ptr<ast> child_a, std::unique_ptr<ast> child_b);
+    virtual ~ast_alt();
+    virtual std::ostream &print(std::ostream &stream);
+};
+
+class ast_rep : public ast {
+    std::unique_ptr<ast> child;
+
+   public:
+    ast_rep(std::unique_ptr<ast> child);
+    virtual ~ast_rep();
     virtual std::ostream &print(std::ostream &stream);
 };
 

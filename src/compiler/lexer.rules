@@ -1,4 +1,5 @@
-R:KW_IDENTIFIER \w+
+L:UNICODES öäĸĸ→
+R:KW_IDENTIFIER |(*(\w))(*(\d))
 L:KW_IF if
 L:KW_ELSE else
 L:KW_ELIF elif
