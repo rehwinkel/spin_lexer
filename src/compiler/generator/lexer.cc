@@ -4,7 +4,6 @@
 #include <utf32.hh>
 
 #include "lexer.hh"
-#include "automata.cc"
 
 int main(int argc, char const *argv[]) {
     std::string out_dir(argv[1]);
@@ -14,6 +13,7 @@ int main(int argc, char const *argv[]) {
 
     std::ifstream in_rules(rules_dir);
     auto rules = read_rules(in_rules);
+    automaton nfa = create_nfa(std::move(rules));
 
     // TODO:
     std::ofstream out_header(out_dir + "/tokens.h");
@@ -24,6 +24,32 @@ int main(int argc, char const *argv[]) {
                 "token::IDENTIFIER; }";
     out_code.close();
     return 0;
+}
+
+automaton create_nfa(std::vector<rule> rules) {
+    std::map<size_t, std::string> names;
+    for (rule &r : rules) {
+        size_t rule_id = reinterpret_cast<size_t>(r.match.get());
+        names[rule_id] = r.name;
+    }
+    std::unique_ptr<ast> match;
+    for (rule &r : rules) {
+        if (match) {
+            match =
+                std::make_unique<ast_alt>(std::move(match), std::move(r.match));
+        } else {
+            match = std::move(r.match);
+        }
+    }
+    std::vector<char_range> alphabet;
+    automaton machine(0, std::set<uint16_t>{}, 0, 0);
+    uint16_t state_count = 0;
+    autopart part = match->connect_machine(machine, alphabet, &state_count);
+    machine.set_state_count(state_count);
+    machine.set_alphabet_size(alphabet.size());
+    automaton dfa = machine.powerset();
+    std::cout << dfa << std::endl;
+    return machine;
 }
 
 std::unique_ptr<ast> parse_regex_rule(std::string &str, size_t *pos);
@@ -288,4 +314,70 @@ std::ostream &ast_rep::print(std::ostream &stream) {
     child->print(stream);
     stream << ")";
     return stream;
+}
+
+char_range make_char_range(chr_t start, chr_t end) {
+    return ((uint64_t)start << 32) | end;
+}
+
+autopart ast::connect_machine(automaton &machine,
+                              std::vector<char_range> &alphabet,
+                              uint16_t *state_count) {
+    throw std::runtime_error("not implemented");
+}
+
+autopart ast_char::connect_machine(automaton &machine,
+                                   std::vector<char_range> &alphabet,
+                                   uint16_t *state_count) {
+    uint16_t start_state = *state_count;
+    *state_count += 1;
+    uint16_t end_state = *state_count;
+    *state_count += 1;
+    char_range c = make_char_range(this->ch, this->ch + 1);
+    auto loc = std::find(alphabet.begin(), alphabet.end(), c);
+    uint32_t input;
+    if (loc == alphabet.end()) {
+        alphabet.push_back(c);
+        input = alphabet.size() - 1;
+    } else {
+        input = loc - alphabet.begin();
+    }
+    machine.connect(start_state, end_state, input + 1);
+    return {start_state, end_state};
+}
+
+autopart ast_class::connect_machine(automaton &machine,
+                                    std::vector<char_range> &alphabet,
+                                    uint16_t *state_count) {
+    throw std::runtime_error("not implemented");
+}
+
+autopart ast_concat::connect_machine(automaton &machine,
+                                     std::vector<char_range> &alphabet,
+                                     uint16_t *state_count) {
+    throw std::runtime_error("not implemented");
+}
+
+autopart ast_alt::connect_machine(automaton &machine,
+                                  std::vector<char_range> &alphabet,
+                                  uint16_t *state_count) {
+    uint16_t start_state = *state_count;
+    *state_count += 1;
+    uint16_t end_state = *state_count;
+    *state_count += 1;
+    autopart child_a_part =
+        this->child_a->connect_machine(machine, alphabet, state_count);
+    autopart child_b_part =
+        this->child_b->connect_machine(machine, alphabet, state_count);
+    machine.connect(start_state, child_a_part.start, 0);
+    machine.connect(start_state, child_b_part.start, 0);
+    machine.connect(child_a_part.end, end_state, 0);
+    machine.connect(child_b_part.end, end_state, 0);
+    return {start_state, end_state};
+}
+
+autopart ast_rep::connect_machine(automaton &machine,
+                                  std::vector<char_range> &alphabet,
+                                  uint16_t *state_count) {
+    throw std::runtime_error("not implemented");
 }

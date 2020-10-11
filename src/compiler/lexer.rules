@@ -1,7 +1,2 @@
-L:UNICODES öäĸĸ→
-R:KW_IDENTIFIER |(*(\w))(*(\d))
-L:KW_IF if
-L:KW_ELSE else
-L:KW_ELIF elif
-L:KW_TRUE true
-L:KW_INLINE inline
+L:KW_A a
+L:KW_B b

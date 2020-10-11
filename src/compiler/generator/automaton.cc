@@ -1,31 +1,4 @@
-#include <set>
-#include <map>
-#include <iostream>
-#include <vector>
-#include <algorithm>
-
-class automaton {
-    uint16_t states, initial;
-    uint32_t alphabet;
-    std::set<uint16_t> finals;
-    std::map<uint64_t, uint16_t> transition;
-    std::set<uint16_t> epsilon_closure(uint16_t state);
-    std::set<uint16_t> input_closure(std::set<uint16_t> &state_e_closure,
-                                     uint32_t input);
-    void _epsilon_closure_rec(std::set<uint16_t> &closure, uint16_t state);
-    void find_state_sets(std::vector<std::set<uint16_t>> &state_sets,
-                         std::map<uint64_t, uint16_t> &new_transition,
-                         std::set<uint16_t> origin);
-
-   public:
-    automaton(uint16_t states, std::set<uint16_t> finals, uint32_t alphabet,
-              uint16_t initial);
-    void connect(uint16_t start, uint16_t end, uint32_t input);
-    uint16_t get(uint16_t start, uint16_t end, uint32_t input);
-    std::set<uint16_t> get(uint16_t start, uint32_t input);
-    automaton powerset();
-    friend std::ostream &operator<<(std::ostream &stream, const automaton &el);
-};
+#include "automaton.hh"
 
 std::ostream &print_set(std::ostream &stream, std::set<uint16_t> states) {
     stream << "{ ";
@@ -60,6 +33,10 @@ std::set<uint16_t> automaton::epsilon_closure(uint16_t state) {
     this->_epsilon_closure_rec(result, state);
     return result;
 }
+
+void automaton::set_state_count(uint16_t states) { this->states = states; }
+
+void automaton::set_alphabet_size(uint32_t size) { this->alphabet = size; }
 
 std::set<uint16_t> automaton::input_closure(std::set<uint16_t> &state_e_closure,
                                             uint32_t input) {
@@ -172,6 +149,27 @@ int main(int argc, char const *argv[]) {
     a.connect(2, 1, 0);
     a.connect(2, 3, 1);
     a.connect(3, 2, 1);
+    automaton b = a.powerset();
+    std::cout << b << std::endl;
+    return 0;
+}
+*/
+
+/*
+int main(int argc, char const *argv[]) {
+    automaton a(10, std::set<uint16_t>{9}, 3, 8);
+    a.connect(8, 0, 0);
+    a.connect(8, 9, 0);
+    a.connect(0, 1, 0);
+    a.connect(0, 5, 0);
+    a.connect(1, 2, 1);
+    a.connect(2, 3, 2);
+    a.connect(3, 4, 0);
+    a.connect(4, 9, 0);
+    a.connect(4, 0, 0);
+    a.connect(5, 6, 1);
+    a.connect(6, 7, 3);
+    a.connect(7, 4, 0);
     automaton b = a.powerset();
     std::cout << b << std::endl;
     return 0;

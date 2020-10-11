@@ -4,7 +4,7 @@ set(CMAKE_BUILD_TYPE Debug)
 
 include_directories(${PROJECT_BINARY_DIR} src/compiler)
 
-add_executable(lexergen src/compiler/generator/lexer.cc src/compiler/utf32.cc)
+add_executable(lexergen src/compiler/generator/lexer.cc src/compiler/generator/automaton.cc src/compiler/utf32.cc)
 set_property(TARGET lexergen PROPERTY CXX_STANDARD 20)
 add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/lexer.cc ${PROJECT_BINARY_DIR}/tokens.h COMMAND lexergen ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/src/compiler/lexer.rules DEPENDS src/compiler/lexer.rules src/compiler/generator/lexer.cc)
 
