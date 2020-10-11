@@ -4,6 +4,7 @@
 #include <utf32.hh>
 
 #include "lexer.hh"
+#include "automata.cc"
 
 int main(int argc, char const *argv[]) {
     std::string out_dir(argv[1]);
