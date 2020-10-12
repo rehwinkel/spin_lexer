@@ -241,7 +241,7 @@ ast_char::ast_char(chr_t ch) : ch(ch) {}
 ast_char::~ast_char() {}
 
 std::ostream &ast_char::print(std::ostream &stream) {
-    stream << "Char(0x" << std::hex << this->ch << ")";
+    stream << "Char(0x" << std::hex << this->ch << std::dec << ")";
     return stream;
 }
 
@@ -331,8 +331,6 @@ autopart ast_char::connect_machine(automaton &machine,
                                    uint16_t *state_count) {
     uint16_t start_state = *state_count;
     *state_count += 1;
-    uint16_t end_state = *state_count;
-    *state_count += 1;
     char_range c = make_char_range(this->ch, this->ch + 1);
     auto loc = std::find(alphabet.begin(), alphabet.end(), c);
     uint32_t input;
@@ -342,6 +340,8 @@ autopart ast_char::connect_machine(automaton &machine,
     } else {
         input = loc - alphabet.begin();
     }
+    uint16_t end_state = *state_count;
+    *state_count += 1;
     machine.connect(start_state, end_state, input + 1);
     return {start_state, end_state};
 }
@@ -355,7 +355,12 @@ autopart ast_class::connect_machine(automaton &machine,
 autopart ast_concat::connect_machine(automaton &machine,
                                      std::vector<char_range> &alphabet,
                                      uint16_t *state_count) {
-    throw std::runtime_error("not implemented");
+    autopart child_a_part =
+        this->child_a->connect_machine(machine, alphabet, state_count);
+    autopart child_b_part =
+        this->child_b->connect_machine(machine, alphabet, state_count);
+    machine.connect(child_a_part.end, child_b_part.start, 0);
+    return {child_a_part.start, child_b_part.end};
 }
 
 autopart ast_alt::connect_machine(automaton &machine,
@@ -363,12 +368,12 @@ autopart ast_alt::connect_machine(automaton &machine,
                                   uint16_t *state_count) {
     uint16_t start_state = *state_count;
     *state_count += 1;
-    uint16_t end_state = *state_count;
-    *state_count += 1;
     autopart child_a_part =
         this->child_a->connect_machine(machine, alphabet, state_count);
     autopart child_b_part =
         this->child_b->connect_machine(machine, alphabet, state_count);
+    uint16_t end_state = *state_count;
+    *state_count += 1;
     machine.connect(start_state, child_a_part.start, 0);
     machine.connect(start_state, child_b_part.start, 0);
     machine.connect(child_a_part.end, end_state, 0);
@@ -379,5 +384,15 @@ autopart ast_alt::connect_machine(automaton &machine,
 autopart ast_rep::connect_machine(automaton &machine,
                                   std::vector<char_range> &alphabet,
                                   uint16_t *state_count) {
-    throw std::runtime_error("not implemented");
+    uint16_t start_state = *state_count;
+    *state_count += 1;
+    autopart child_part =
+        this->child->connect_machine(machine, alphabet, state_count);
+    uint16_t end_state = *state_count;
+    *state_count += 1;
+    machine.connect(start_state, end_state, 0);
+    machine.connect(start_state, child_part.start, 0);
+    machine.connect(child_part.end, end_state, 0);
+    machine.connect(child_part.end, child_part.start, 0);
+    return {start_state, end_state};
 }

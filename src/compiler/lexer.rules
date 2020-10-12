@@ -1,2 +1,4 @@
-L:KW_A a
-L:KW_B b
+L:KW_ELSE else
+L:KW_ELIF elif
+L:KW_IF if
+R:NUM 1*(0)
