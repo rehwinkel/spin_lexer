@@ -27,25 +27,57 @@ void generate_cpp(std::string dir, automaton machine, uint16_t trap,
                   std::vector<char_range> alphabet) {
     std::ofstream out_code(dir);
     out_code << "#include <lexer.hh>\n\ntoken lexer::next() {" << std::endl;
-    out_code << "    uint16_t state = " << machine.initial << ";" << std::endl
-             << "    while (1) {" << std::endl
-             << "        switch (state) {" << std::endl
-             << "            default:" << std::endl
-             << "                return token::ERROR;" << std::endl
-             << "        }" << std::endl
-             << "    }" << std::endl;
-    out_code << "    return token::ERROR;" << std::endl;
-    out_code << "}";
+    out_code << "uint16_t state = " << machine.initial << ";" << std::endl
+             << "while (1) {" << std::endl
+             << "utf32::chr_t next = this->stream.get();" << std::endl
+             << "switch (state) {" << std::endl;
+    // << "std::cout << state << std::endl;" << std::endl
+    for (uint16_t i = 0; i < machine.states; i++) {
+        if (i != trap) {
+            out_code << "case " << i << ":" << std::endl;
+            out_code << "switch (next) {" << std::endl;
+            bool is_final = final_mapping.find(i) != final_mapping.end();
+            for (size_t a = 1; a <= machine.alphabet; a++) {
+                char_range range = alphabet[a - 1];
+                chr_t r_start = range >> 32;
+                chr_t r_end = range - 1;
+                uint16_t next_state = *machine.get(i, a).begin();
+                if (!is_final || next_state != trap) {
+                    if (r_start != r_end) {
+                        out_code << "case " << r_start << " ... " << r_end
+                                 << ":" << std::endl;
+                    } else {
+                        out_code << "case " << r_end << ":" << std::endl;
+                    }
+                    out_code << "state = " << next_state << ";" << std::endl;
+                    out_code << "break;" << std::endl;
+                }
+            }
+            if (is_final) {
+                out_code << "default:" << std::endl;
+                out_code << "this->stream.back();" << std::endl;
+                out_code << "return token::" << names[final_mapping[i]] << ";"
+                         << std::endl;
+            } else {
+                out_code << "default:" << std::endl;
+                out_code << "state = " << trap << ";" << std::endl;
+                out_code << "break;" << std::endl;
+            }
+            out_code << "}" << std::endl;
+            out_code << "break;" << std::endl;
+        }
+    }
+    out_code << "default: return token::ERROR; }}return token::ERROR;}";
     out_code.close();
 }
 
 void generate_header(std::string dir, std::map<uint16_t, std::string> names) {
     std::ofstream out_header(dir);
     out_header << "enum token {" << std::endl;
+    out_header << "    ERROR," << std::endl;
     for (auto &pair : names) {
         out_header << "    " << pair.second << "," << std::endl;
     }
-    out_header << "    ERROR," << std::endl;
     out_header << "};";
     out_header.close();
 }

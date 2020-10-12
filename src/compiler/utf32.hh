@@ -1,6 +1,6 @@
 #pragma once
 
-#include <istream>
+#include <iostream>
 #include <string>
 
 namespace utf32 {
@@ -50,6 +50,7 @@ namespace utf32 {
         stream(const stream &other) = delete;
         stream(stream &&other) = default;
         chr_t get();
+        void back();
         size_t pos();
         bool end();
         string &data();

@@ -4,6 +4,8 @@
 #include <vector>
 #include <algorithm>
 
+std::ostream &print_set(std::ostream &stream, std::set<uint16_t> states);
+
 class automaton {
     std::set<uint16_t> epsilon_closure(uint16_t state);
     std::set<uint16_t> input_closure(std::set<uint16_t> &state_e_closure,

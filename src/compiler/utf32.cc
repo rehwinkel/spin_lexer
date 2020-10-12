@@ -161,3 +161,5 @@ size_t stream::pos() { return this->m_position; }
 bool stream::end() { return this->m_position == this->m_data.len(); }
 
 string &stream::data() { return this->m_data; }
+
+void stream::back() { this->m_position--; }

@@ -1,4 +1,4 @@
 L:KW_ELSE else
 L:KW_ELIF elif
 L:KW_IF if
-R:NUM 1*(0)
+R:NUM \d*(\d)
