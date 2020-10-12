@@ -34,10 +34,6 @@ std::set<uint16_t> automaton::epsilon_closure(uint16_t state) {
     return result;
 }
 
-void automaton::set_state_count(uint16_t states) { this->states = states; }
-
-void automaton::set_alphabet_size(uint32_t size) { this->alphabet = size; }
-
 std::set<uint16_t> automaton::input_closure(std::set<uint16_t> &state_e_closure,
                                             uint32_t input) {
     std::set<uint16_t> result;
@@ -66,10 +62,10 @@ std::set<uint16_t> automaton::get(uint16_t start, uint32_t input) {
 }
 
 std::ostream &operator<<(std::ostream &stream, const automaton &el) {
-    stream << "Automaton(states=" << el.states << ", initial=" << el.initial
+    stream << "Automaton(states=" << el.states << ", initial=" << el.initial + 1
            << ", alphabet=" << el.alphabet << ", finals={ ";
     for (uint16_t state : el.finals) {
-        stream << state << " ";
+        stream << state + 1 << " ";
     }
     stream << "}, connections=[ ";
     for (auto &pair : el.transition) {
@@ -106,7 +102,8 @@ void automaton::find_state_sets(std::vector<std::set<uint16_t>> &state_sets,
     }
 }
 
-automaton automaton::powerset() {
+std::pair<automaton, uint16_t> automaton::powerset(
+    std::map<uint16_t, uint16_t> &final_mapping) {
     std::vector<std::set<uint16_t>> state_sets;
     std::map<uint64_t, uint16_t> new_transition;
     auto initial_closure = this->epsilon_closure(this->initial);
@@ -122,6 +119,9 @@ automaton automaton::powerset() {
                 std::find(state_sets.begin(), state_sets.end(), state_set) -
                 state_sets.begin();
             new_finals.push_back(state);
+            for (uint16_t orig_final : tmp_finals_inters) {
+                final_mapping[state] = orig_final;
+            }
         }
     }
     automaton resulting(
@@ -136,7 +136,10 @@ automaton automaton::powerset() {
         uint32_t input = pair.first;
         resulting.connect(start, end, input);
     }
-    return resulting;
+    return std::make_pair(
+        resulting,
+        std::find(state_sets.begin(), state_sets.end(), std::set<uint16_t>{}) -
+            state_sets.begin());
 }
 
 /*

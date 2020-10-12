@@ -13,24 +13,49 @@ int main(int argc, char const *argv[]) {
 
     std::ifstream in_rules(rules_dir);
     auto rules = read_rules(in_rules);
-    automaton nfa = create_nfa(std::move(rules));
+    auto [dfa, dead, names, final_map, alphabet] =
+        create_full_dfa(std::move(rules));
 
-    // TODO:
-    std::ofstream out_header(out_dir + "/tokens.h");
-    std::ofstream out_code(out_dir + "/lexer.cc");
-    out_header << "enum token { IDENTIFIER };";
-    out_header.close();
-    out_code << "#include <lexer.hh>\n\ntoken lexer::next() { return "
-                "token::IDENTIFIER; }";
-    out_code.close();
+    generate_header(out_dir + "/tokens.h", names);
+    generate_cpp(out_dir + "/lexer.cc", dfa, dead, names, final_map, alphabet);
     return 0;
 }
 
-automaton create_nfa(std::vector<rule> rules) {
+void generate_cpp(std::string dir, automaton machine, uint16_t trap,
+                  std::map<uint16_t, std::string> names,
+                  std::map<uint16_t, uint16_t> final_mapping,
+                  std::vector<char_range> alphabet) {
+    std::ofstream out_code(dir);
+    out_code << "#include <lexer.hh>\n\ntoken lexer::next() {" << std::endl;
+    out_code << "    uint16_t state = " << machine.initial << ";" << std::endl
+             << "    while (1) {" << std::endl
+             << "        switch (state) {" << std::endl
+             << "            default:" << std::endl
+             << "                return token::ERROR;" << std::endl
+             << "        }" << std::endl
+             << "    }" << std::endl;
+    out_code << "    return token::ERROR;" << std::endl;
+    out_code << "}";
+    out_code.close();
+}
+
+void generate_header(std::string dir, std::map<uint16_t, std::string> names) {
+    std::ofstream out_header(dir);
+    out_header << "enum token {" << std::endl;
+    for (auto &pair : names) {
+        out_header << "    " << pair.second << "," << std::endl;
+    }
+    out_header << "    ERROR," << std::endl;
+    out_header << "};";
+    out_header.close();
+}
+
+std::tuple<automaton, uint16_t, std::map<uint16_t, std::string>,
+           std::map<uint16_t, uint16_t>, std::vector<char_range>>
+create_full_dfa(std::vector<rule> rules) {
     std::map<size_t, std::string> names;
     for (rule &r : rules) {
-        size_t rule_id = reinterpret_cast<size_t>(r.match.get());
-        names[rule_id] = r.name;
+        names[r.match->id()] = r.name;
     }
     std::unique_ptr<ast> match;
     for (rule &r : rules) {
@@ -42,14 +67,36 @@ automaton create_nfa(std::vector<rule> rules) {
         }
     }
     std::vector<char_range> alphabet;
+    std::vector<chr_t> pre_alphabet;
+    match->construct_alphabet(pre_alphabet);
+    std::sort(pre_alphabet.begin(), pre_alphabet.end());
+    chr_t current = -1;
+    for (chr_t p : pre_alphabet) {
+        if (current == -1) {
+            current = p;
+        } else {
+            if (current != p) {
+                alphabet.push_back(make_char_range(current, p));
+                current = p;
+            }
+        }
+    }
+
+    std::map<uint16_t, std::string> finals;
     automaton machine(0, std::set<uint16_t>{}, 0, 0);
     uint16_t state_count = 0;
-    autopart part = match->connect_machine(machine, alphabet, &state_count);
-    machine.set_state_count(state_count);
-    machine.set_alphabet_size(alphabet.size());
-    automaton dfa = machine.powerset();
-    std::cout << dfa << std::endl;
-    return machine;
+    autopart part =
+        match->connect_machine(machine, alphabet, names, finals, &state_count);
+    machine.states = state_count;
+    machine.alphabet = alphabet.size();
+    std::set<uint16_t> actual_finals;
+    for (auto &fin : finals) {
+        actual_finals.insert(fin.first);
+    }
+    machine.finals = actual_finals;
+    std::map<uint16_t, uint16_t> final_mapping;
+    auto [dfa, dead] = machine.powerset(final_mapping);
+    return std::make_tuple(dfa, dead, finals, final_mapping, alphabet);
 }
 
 std::unique_ptr<ast> parse_regex_rule(std::string &str, size_t *pos);
@@ -97,21 +144,12 @@ std::unique_ptr<ast> parse_escape(std::string &str, size_t *pos) {
         case 'w':
             *pos += 1;
             return std::make_unique<ast_class>(regex_class::WORD);
-        case 'W':
-            *pos += 1;
-            return std::make_unique<ast_class>(regex_class::NOT_WORD);
         case 's':
             *pos += 1;
             return std::make_unique<ast_class>(regex_class::SPACE);
-        case 'S':
-            *pos += 1;
-            return std::make_unique<ast_class>(regex_class::NOT_SPACE);
         case 'd':
             *pos += 1;
             return std::make_unique<ast_class>(regex_class::DIGIT);
-        case 'D':
-            *pos += 1;
-            return std::make_unique<ast_class>(regex_class::NOT_DIGIT);
         case '*':
             *pos += 1;
             return std::make_unique<ast_char>('*');
@@ -135,6 +173,10 @@ std::unique_ptr<ast> parse_escape(std::string &str, size_t *pos) {
             chr_t code = std::stoi(str.substr(*pos, 4), 0, 16);
             *pos += 4;
             return std::make_unique<ast_char>(code);
+        }
+        case 'n': {
+            *pos += 1;
+            return std::make_unique<ast_char>('\n');
         }
         default:
             throw std::runtime_error("error while parsing regex: " + str);
@@ -229,7 +271,11 @@ std::vector<rule> read_rules(std::istream &stream) {
     return rules;
 }
 
+ast::ast() : index(ast_counter++) {}
+
 ast::~ast() {}
+
+size_t ast::id() { return this->index; }
 
 std::ostream &ast::print(std::ostream &stream) {
     stream << "EMPTY";
@@ -259,15 +305,6 @@ std::ostream &ast_class::print(std::ostream &stream) {
             break;
         case SPACE:
             stream << "SPACE";
-            break;
-        case NOT_WORD:
-            stream << "NOT_WORD";
-            break;
-        case NOT_DIGIT:
-            stream << "NOT_DIGIT";
-            break;
-        case NOT_SPACE:
-            stream << "NOT_SPACE";
             break;
 
         default:
@@ -320,60 +357,116 @@ char_range make_char_range(chr_t start, chr_t end) {
     return ((uint64_t)start << 32) | end;
 }
 
-autopart ast::connect_machine(automaton &machine,
-                              std::vector<char_range> &alphabet,
-                              uint16_t *state_count) {
-    throw std::runtime_error("not implemented");
+void connect_range(chr_t begin, chr_t end, uint16_t start_state,
+                   uint16_t end_state, automaton &machine,
+                   std::vector<char_range> &alphabet) {
+    size_t start_index = std::find_if(alphabet.begin(), alphabet.end(),
+                                      [&begin](const char_range &arg) {
+                                          return begin == arg >> 32;
+                                      }) -
+                         alphabet.begin();
+    size_t end_index = std::find_if(alphabet.begin(), alphabet.end(),
+                                    [&end](const char_range &arg) {
+                                        return end == (chr_t)arg;
+                                    }) -
+                       alphabet.begin();
+    for (size_t i = start_index; i < end_index + 1; i++) {
+        machine.connect(start_state, end_state, i + 1);
+    }
+}
+
+void connect_char(chr_t ch, uint16_t start_state, uint16_t end_state,
+                  automaton &machine, std::vector<char_range> &alphabet) {
+    connect_range(ch, ch + 1, start_state, end_state, machine, alphabet);
 }
 
 autopart ast_char::connect_machine(automaton &machine,
                                    std::vector<char_range> &alphabet,
+                                   std::map<size_t, std::string> &names,
+                                   std::map<uint16_t, std::string> &finals,
                                    uint16_t *state_count) {
     uint16_t start_state = *state_count;
     *state_count += 1;
-    char_range c = make_char_range(this->ch, this->ch + 1);
-    auto loc = std::find(alphabet.begin(), alphabet.end(), c);
-    uint32_t input;
-    if (loc == alphabet.end()) {
-        alphabet.push_back(c);
-        input = alphabet.size() - 1;
-    } else {
-        input = loc - alphabet.begin();
-    }
     uint16_t end_state = *state_count;
     *state_count += 1;
-    machine.connect(start_state, end_state, input + 1);
+    auto a = names.find(this->id());
+    if (a != names.end()) {
+        finals[end_state] = a->second;
+    }
+    connect_char(this->ch, start_state, end_state, machine, alphabet);
     return {start_state, end_state};
 }
 
 autopart ast_class::connect_machine(automaton &machine,
                                     std::vector<char_range> &alphabet,
+                                    std::map<size_t, std::string> &names,
+                                    std::map<uint16_t, std::string> &finals,
                                     uint16_t *state_count) {
-    throw std::runtime_error("not implemented");
+    uint16_t start_state = *state_count;
+    *state_count += 1;
+    uint16_t end_state = *state_count;
+    *state_count += 1;
+    auto a = names.find(this->id());
+    if (a != names.end()) {
+        finals[end_state] = a->second;
+    }
+
+    switch (this->cls) {
+        case WORD:
+            connect_range('a', 'z' + 1, start_state, end_state, machine,
+                          alphabet);
+            connect_range('A', 'Z' + 1, start_state, end_state, machine,
+                          alphabet);
+            break;
+        case DIGIT:
+            connect_range('0', '9' + 1, start_state, end_state, machine,
+                          alphabet);
+            break;
+        case SPACE:
+            connect_char(' ', start_state, end_state, machine, alphabet);
+            connect_char('\t', start_state, end_state, machine, alphabet);
+            connect_char('\n', start_state, end_state, machine, alphabet);
+            connect_char('\f', start_state, end_state, machine, alphabet);
+            connect_char('\r', start_state, end_state, machine, alphabet);
+            break;
+    }
+    return {start_state, end_state};
 }
 
 autopart ast_concat::connect_machine(automaton &machine,
                                      std::vector<char_range> &alphabet,
+                                     std::map<size_t, std::string> &names,
+                                     std::map<uint16_t, std::string> &finals,
                                      uint16_t *state_count) {
-    autopart child_a_part =
-        this->child_a->connect_machine(machine, alphabet, state_count);
-    autopart child_b_part =
-        this->child_b->connect_machine(machine, alphabet, state_count);
+    autopart child_a_part = this->child_a->connect_machine(
+        machine, alphabet, names, finals, state_count);
+    autopart child_b_part = this->child_b->connect_machine(
+        machine, alphabet, names, finals, state_count);
     machine.connect(child_a_part.end, child_b_part.start, 0);
+    auto a = names.find(this->id());
+    if (a != names.end()) {
+        finals[child_b_part.end] = a->second;
+    }
     return {child_a_part.start, child_b_part.end};
 }
 
 autopart ast_alt::connect_machine(automaton &machine,
                                   std::vector<char_range> &alphabet,
+                                  std::map<size_t, std::string> &names,
+                                  std::map<uint16_t, std::string> &finals,
                                   uint16_t *state_count) {
     uint16_t start_state = *state_count;
     *state_count += 1;
-    autopart child_a_part =
-        this->child_a->connect_machine(machine, alphabet, state_count);
-    autopart child_b_part =
-        this->child_b->connect_machine(machine, alphabet, state_count);
+    autopart child_a_part = this->child_a->connect_machine(
+        machine, alphabet, names, finals, state_count);
+    autopart child_b_part = this->child_b->connect_machine(
+        machine, alphabet, names, finals, state_count);
     uint16_t end_state = *state_count;
     *state_count += 1;
+    auto a = names.find(this->id());
+    if (a != names.end()) {
+        finals[end_state] = a->second;
+    }
     machine.connect(start_state, child_a_part.start, 0);
     machine.connect(start_state, child_b_part.start, 0);
     machine.connect(child_a_part.end, end_state, 0);
@@ -383,16 +476,68 @@ autopart ast_alt::connect_machine(automaton &machine,
 
 autopart ast_rep::connect_machine(automaton &machine,
                                   std::vector<char_range> &alphabet,
+                                  std::map<size_t, std::string> &names,
+                                  std::map<uint16_t, std::string> &finals,
                                   uint16_t *state_count) {
     uint16_t start_state = *state_count;
     *state_count += 1;
-    autopart child_part =
-        this->child->connect_machine(machine, alphabet, state_count);
+    autopart child_part = this->child->connect_machine(machine, alphabet, names,
+                                                       finals, state_count);
     uint16_t end_state = *state_count;
     *state_count += 1;
+    auto a = names.find(this->id());
+    if (a != names.end()) {
+        finals[end_state] = a->second;
+    }
     machine.connect(start_state, end_state, 0);
     machine.connect(start_state, child_part.start, 0);
     machine.connect(child_part.end, end_state, 0);
     machine.connect(child_part.end, child_part.start, 0);
     return {start_state, end_state};
+}
+
+void ast_char::construct_alphabet(std::vector<chr_t> &alphabet) {
+    alphabet.push_back(this->ch);
+    alphabet.push_back(this->ch + 1);
+}
+
+void ast_class::construct_alphabet(std::vector<chr_t> &alphabet) {
+    switch (this->cls) {
+        case WORD:
+            alphabet.push_back('a');
+            alphabet.push_back('z' + 1);
+            alphabet.push_back('A');
+            alphabet.push_back('Z' + 1);
+            break;
+        case DIGIT:
+            alphabet.push_back('0');
+            alphabet.push_back('9' + 1);
+            break;
+        case SPACE:
+            alphabet.push_back(' ');
+            alphabet.push_back(' ' + 1);
+            alphabet.push_back('\t');
+            alphabet.push_back('\t' + 1);
+            alphabet.push_back('\n');
+            alphabet.push_back('\n' + 1);
+            alphabet.push_back('\f');
+            alphabet.push_back('\f' + 1);
+            alphabet.push_back('\r');
+            alphabet.push_back('\r' + 1);
+            break;
+    }
+}
+
+void ast_alt::construct_alphabet(std::vector<chr_t> &alphabet) {
+    this->child_a->construct_alphabet(alphabet);
+    this->child_b->construct_alphabet(alphabet);
+}
+
+void ast_rep::construct_alphabet(std::vector<chr_t> &alphabet) {
+    this->child->construct_alphabet(alphabet);
+}
+
+void ast_concat::construct_alphabet(std::vector<chr_t> &alphabet) {
+    this->child_a->construct_alphabet(alphabet);
+    this->child_b->construct_alphabet(alphabet);
 }
