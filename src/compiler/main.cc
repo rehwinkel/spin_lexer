@@ -10,7 +10,13 @@ int main(int argc, char const *argv[]) {
         throw std::runtime_error("unable to open file: " + path);
     }
     lexer my_lexer(in_file);
-    token t = my_lexer.next();
-    std::cout << t << std::endl;
+    while (1) {
+        token t = my_lexer.next();
+        auto s = my_lexer.tk_str();
+        std::cout << t << ": '" << s << "'" << std::endl;
+        if (t == token::ERROR) {
+            break;
+        }
+    }
     return 0;
 }

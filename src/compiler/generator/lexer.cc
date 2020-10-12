@@ -28,6 +28,7 @@ void generate_cpp(std::string dir, automaton machine, uint16_t trap,
     std::ofstream out_code(dir);
     out_code << "#include <lexer.hh>\n\ntoken lexer::next() {" << std::endl;
     out_code << "uint16_t state = " << machine.initial << ";" << std::endl
+             << "this->m_tk_start = this->stream.pos();" << std::endl
              << "while (1) {" << std::endl
              << "utf32::chr_t next = this->stream.get();" << std::endl
              << "switch (state) {" << std::endl;
@@ -55,7 +56,10 @@ void generate_cpp(std::string dir, automaton machine, uint16_t trap,
             }
             if (is_final) {
                 out_code << "default:" << std::endl;
-                out_code << "this->stream.back();" << std::endl;
+                out_code << "this->stream.back();" << std::endl
+                         << "this->m_tk_length = this->stream.pos() - "
+                            "this->m_tk_start;"
+                         << std::endl;
                 out_code << "return token::" << names[final_mapping[i]] << ";"
                          << std::endl;
             } else {

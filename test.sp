@@ -1,1 +1,3 @@
-abcdefghiöäüäßßĸĸ৪𑅗
+fun main(argc: int, argv: char**) int {
+    return 0;
+}
