@@ -68,11 +68,10 @@ class ast_class : public ast {
 };
 
 class ast_cat : public ast {
-    std::unique_ptr<ast> child_a;
-    std::unique_ptr<ast> child_b;
+    std::vector<std::unique_ptr<ast>> children;
 
    public:
-    ast_cat(std::unique_ptr<ast> child_a, std::unique_ptr<ast> child_b);
+    ast_cat(std::vector<std::unique_ptr<ast>> children);
     virtual autopart connect_machine(automaton &machine,
                                      std::vector<char_range> &alphabet,
                                      std::map<size_t, std::string> &names,
@@ -84,11 +83,10 @@ class ast_cat : public ast {
 };
 
 class ast_alt : public ast {
-    std::unique_ptr<ast> child_a;
-    std::unique_ptr<ast> child_b;
+    std::vector<std::unique_ptr<ast>> children;
 
    public:
-    ast_alt(std::unique_ptr<ast> child_a, std::unique_ptr<ast> child_b);
+    ast_alt(std::vector<std::unique_ptr<ast>> children);
     virtual autopart connect_machine(automaton &machine,
                                      std::vector<char_range> &alphabet,
                                      std::map<size_t, std::string> &names,
@@ -101,9 +99,10 @@ class ast_alt : public ast {
 
 class ast_rep : public ast {
     std::unique_ptr<ast> child;
+    bool accept_empty;
 
    public:
-    ast_rep(std::unique_ptr<ast> child);
+    ast_rep(std::unique_ptr<ast> child, bool accept_empty);
     virtual autopart connect_machine(automaton &machine,
                                      std::vector<char_range> &alphabet,
                                      std::map<size_t, std::string> &names,

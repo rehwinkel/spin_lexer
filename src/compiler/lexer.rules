@@ -1,6 +1,6 @@
 R:IDENTIFIER \w*(|(\w)(|(_)(\d)))
-R:NUMBER \d*(\d)
-R:SPACE \s*(\s)
+R:NUMBER +(\d)
+R:SPACE +(\s)
 L:LPAR (
 L:RPAR )
 L:LBRACE {

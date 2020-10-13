@@ -42,40 +42,47 @@ std::ostream &ast_class::print(std::ostream &stream) {
     return stream;
 }
 
-ast_cat::ast_cat(std::unique_ptr<ast> child_a, std::unique_ptr<ast> child_b)
-    : child_a(std::move(child_a)), child_b(std::move(child_b)) {}
+ast_cat::ast_cat(std::vector<std::unique_ptr<ast>> children)
+    : children(std::move(children)) {}
 
 ast_cat::~ast_cat() {}
 
 std::ostream &ast_cat::print(std::ostream &stream) {
-    stream << "Concat(";
-    child_a->print(stream);
-    stream << ", ";
-    child_b->print(stream);
+    stream << "Cat(";
+    for (size_t i = 0; i < this->children.size(); i++) {
+        this->children[i]->print(stream);
+        if (i + 1 < this->children.size()) {
+            stream << ", ";
+        }
+    }
     stream << ")";
     return stream;
 }
 
-ast_alt::ast_alt(std::unique_ptr<ast> child_a, std::unique_ptr<ast> child_b)
-    : child_a(std::move(child_a)), child_b(std::move(child_b)) {}
+ast_alt::ast_alt(std::vector<std::unique_ptr<ast>> children)
+    : children(std::move(children)) {}
 
 ast_alt::~ast_alt() {}
 
 std::ostream &ast_alt::print(std::ostream &stream) {
-    stream << "Alternative(";
-    child_a->print(stream);
-    stream << ", ";
-    child_b->print(stream);
+    stream << "Alt(";
+    for (size_t i = 0; i < this->children.size(); i++) {
+        this->children[i]->print(stream);
+        if (i + 1 < this->children.size()) {
+            stream << ", ";
+        }
+    }
     stream << ")";
     return stream;
 }
 
-ast_rep::ast_rep(std::unique_ptr<ast> child) : child(std::move(child)) {}
+ast_rep::ast_rep(std::unique_ptr<ast> child, bool accept_empty)
+    : child(std::move(child)), accept_empty(accept_empty) {}
 
 ast_rep::~ast_rep() {}
 
 std::ostream &ast_rep::print(std::ostream &stream) {
-    stream << "Repeat(";
+    stream << "Rep(empty=" << this->accept_empty << ", ";
     child->print(stream);
     stream << ")";
     return stream;
@@ -166,16 +173,27 @@ autopart ast_cat::connect_machine(automaton &machine,
                                   std::map<size_t, std::string> &names,
                                   std::map<uint16_t, std::string> &finals,
                                   uint16_t *state_count) {
-    autopart child_a_part = this->child_a->connect_machine(
-        machine, alphabet, names, finals, state_count);
-    autopart child_b_part = this->child_b->connect_machine(
-        machine, alphabet, names, finals, state_count);
-    machine.connect(child_a_part.end, child_b_part.start, 0);
-    auto a = names.find(this->id());
-    if (a != names.end()) {
-        finals[child_b_part.end] = a->second;
+    if (this->children.size() > 1) {
+        std::vector<autopart> parts;
+        for (auto &child : this->children) {
+            autopart child_part = child->connect_machine(
+                machine, alphabet, names, finals, state_count);
+            parts.push_back(child_part);
+        }
+        for (size_t i = 0; i + 1 < parts.size(); i++) {
+            auto &prev = parts[i];
+            auto &next = parts[i + 1];
+            machine.connect(prev.end, next.start, 0);
+        }
+        auto a = names.find(this->id());
+        if (a != names.end()) {
+            finals[parts[parts.size() - 1].end] = a->second;
+        }
+        return {parts[0].start, parts[parts.size() - 1].end};
+    } else {
+        return this->children[0]->connect_machine(machine, alphabet, names,
+                                                  finals, state_count);
     }
-    return {child_a_part.start, child_b_part.end};
 }
 
 autopart ast_alt::connect_machine(automaton &machine,
@@ -185,20 +203,22 @@ autopart ast_alt::connect_machine(automaton &machine,
                                   uint16_t *state_count) {
     uint16_t start_state = *state_count;
     *state_count += 1;
-    autopart child_a_part = this->child_a->connect_machine(
-        machine, alphabet, names, finals, state_count);
-    autopart child_b_part = this->child_b->connect_machine(
-        machine, alphabet, names, finals, state_count);
+    std::vector<autopart> parts;
+    for (auto &child : this->children) {
+        autopart child_part = child->connect_machine(machine, alphabet, names,
+                                                     finals, state_count);
+        parts.push_back(child_part);
+    }
     uint16_t end_state = *state_count;
     *state_count += 1;
     auto a = names.find(this->id());
     if (a != names.end()) {
         finals[end_state] = a->second;
     }
-    machine.connect(start_state, child_a_part.start, 0);
-    machine.connect(start_state, child_b_part.start, 0);
-    machine.connect(child_a_part.end, end_state, 0);
-    machine.connect(child_b_part.end, end_state, 0);
+    for (autopart &part : parts) {
+        machine.connect(start_state, part.start, 0);
+        machine.connect(part.end, end_state, 0);
+    }
     return {start_state, end_state};
 }
 
@@ -217,7 +237,9 @@ autopart ast_rep::connect_machine(automaton &machine,
     if (a != names.end()) {
         finals[end_state] = a->second;
     }
-    machine.connect(start_state, end_state, 0);
+    if (this->accept_empty) {
+        machine.connect(start_state, end_state, 0);
+    }
     machine.connect(start_state, child_part.start, 0);
     machine.connect(child_part.end, end_state, 0);
     machine.connect(child_part.end, child_part.start, 0);
@@ -257,15 +279,17 @@ void ast_class::construct_alphabet(std::vector<chr_t> &alphabet) {
 }
 
 void ast_alt::construct_alphabet(std::vector<chr_t> &alphabet) {
-    this->child_a->construct_alphabet(alphabet);
-    this->child_b->construct_alphabet(alphabet);
+    for (auto &child : this->children) {
+        child->construct_alphabet(alphabet);
+    }
+}
+
+void ast_cat::construct_alphabet(std::vector<chr_t> &alphabet) {
+    for (auto &child : this->children) {
+        child->construct_alphabet(alphabet);
+    }
 }
 
 void ast_rep::construct_alphabet(std::vector<chr_t> &alphabet) {
     this->child->construct_alphabet(alphabet);
-}
-
-void ast_cat::construct_alphabet(std::vector<chr_t> &alphabet) {
-    this->child_a->construct_alphabet(alphabet);
-    this->child_b->construct_alphabet(alphabet);
 }

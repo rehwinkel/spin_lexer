@@ -13,11 +13,13 @@ int main(int argc, char const *argv[]) {
 
     std::ifstream in_rules(rules_dir);
     auto rules = read_rules(in_rules);
-    auto [dfa, dead, names, final_map, alphabet] =
-        create_full_dfa(std::move(rules));
+    dfa_meta dfa = create_full_dfa(std::move(rules));
+    // std::cout << dfa.machine << std::endl;
+    // std::cout << "trap: " << dfa.trap << std::endl;
 
-    generate_header(out_dir + "/tokens.h", names);
-    generate_cpp(out_dir + "/lexer.cc", dfa, dead, names, final_map, alphabet);
+    generate_header(out_dir + "/tokens.h", dfa.names);
+    generate_cpp(out_dir + "/lexer.cc", dfa.machine, dfa.trap, dfa.names,
+                 dfa.final_mapping, dfa.alphabet);
     return 0;
 }
 
@@ -26,15 +28,11 @@ dfa_meta create_full_dfa(std::vector<rule> rules) {
     for (rule &r : rules) {
         names[r.match->id()] = r.name;
     }
-    std::unique_ptr<ast> match;
+    std::vector<std::unique_ptr<ast>> match_seq;
     for (rule &r : rules) {
-        if (match) {
-            match =
-                std::make_unique<ast_alt>(std::move(match), std::move(r.match));
-        } else {
-            match = std::move(r.match);
-        }
+        match_seq.emplace_back(std::move(r.match));
     }
+    auto match = std::make_unique<ast_alt>(std::move(match_seq));
     std::vector<char_range> alphabet;
     std::vector<chr_t> pre_alphabet;
     match->construct_alphabet(pre_alphabet);
@@ -64,6 +62,7 @@ dfa_meta create_full_dfa(std::vector<rule> rules) {
     }
     machine.finals = actual_finals;
     std::map<uint16_t, uint16_t> final_mapping;
+    // std::cout << machine << std::endl;
     auto [dfa, dead] = machine.powerset(final_mapping);
     return {dfa, dead, finals, final_mapping, alphabet};
 }
