@@ -68,22 +68,36 @@ dfa_meta create_full_dfa(std::vector<rule> rules) {
     return {dfa, dead, finals, final_mapping, alphabet};
 }
 
+inline std::ostream &write_line(std::ostream &stream, const char *content,
+                                int indent, bool newline = true) {
+    for (size_t i = 0; i < indent; i++) {
+        stream << "    ";
+    }
+    stream << content;
+    if (newline) {
+        stream << std::endl;
+    }
+    return stream;
+}
+
 void generate_cpp(std::string dir, automaton machine, uint16_t trap,
                   std::map<uint16_t, std::string> names,
                   std::map<uint16_t, uint16_t> final_mapping,
                   std::vector<char_range> alphabet) {
     std::ofstream out_code(dir);
-    out_code << "#include <lexer.hh>\n\ntoken lexer::next() {" << std::endl;
-    out_code << "uint16_t state = " << machine.initial << ";" << std::endl
-             << "this->m_tk_start = this->stream.pos();" << std::endl
-             << "while (1) {" << std::endl
-             << "utf32::chr_t next = this->stream.get();" << std::endl
-             << "switch (state) {" << std::endl;
-    // << "std::cout << state << std::endl;" << std::endl
+    write_line(out_code, "#include <lexer.hh>", 0);
+    out_code << std::endl;
+    write_line(out_code, "token lexer::next() {", 0);
+    write_line(out_code, "uint16_t state = ", 1, false)
+        << machine.initial << ";" << std::endl;
+    write_line(out_code, "this->m_tk_start = this->stream.pos();", 1);
+    write_line(out_code, "while (1) {", 1);
+    write_line(out_code, "utf32::chr_t next = this->stream.get();", 2);
+    write_line(out_code, "switch (state) {", 2);
     for (uint16_t i = 0; i < machine.states; i++) {
         if (i != trap) {
-            out_code << "case " << i << ":" << std::endl;
-            out_code << "switch (next) {" << std::endl;
+            write_line(out_code, "case ", 3, false) << i << ":" << std::endl;
+            write_line(out_code, "switch (next) {", 4);
             bool is_final = final_mapping.find(i) != final_mapping.end();
             for (size_t a = 1; a <= machine.alphabet; a++) {
                 char_range range = alphabet[a - 1];
@@ -91,44 +105,54 @@ void generate_cpp(std::string dir, automaton machine, uint16_t trap,
                 chr_t r_end = range - 1;
                 uint16_t next_state = *machine.get(i, a).begin();
                 if (!is_final || next_state != trap) {
+                    write_line(out_code, "case ", 5, false);
                     if (r_start != r_end) {
-                        out_code << "case " << r_start << " ... " << r_end
-                                 << ":" << std::endl;
+                        out_code << r_start << " ... " << r_end << ":"
+                                 << std::endl;
                     } else {
-                        out_code << "case " << r_end << ":" << std::endl;
+                        out_code << r_end << ":" << std::endl;
                     }
-                    out_code << "state = " << next_state << ";" << std::endl;
-                    out_code << "break;" << std::endl;
+                    write_line(out_code, "state = ", 6, false)
+                        << next_state << ";" << std::endl;
+                    write_line(out_code, "break;", 6);
                 }
             }
             if (is_final) {
-                out_code << "default:" << std::endl;
-                out_code << "this->stream.back();" << std::endl
-                         << "this->m_tk_length = this->stream.pos() - "
-                            "this->m_tk_start;"
-                         << std::endl;
-                out_code << "return token::" << names[final_mapping[i]] << ";"
-                         << std::endl;
+                write_line(out_code, "default:", 5);
+                write_line(out_code, "this->stream.back();", 6);
+                write_line(out_code,
+                           "this->m_tk_length = this->stream.pos() - "
+                           "this->m_tk_start;",
+                           6);
+                write_line(out_code, "return token::", 6, false)
+                    << names[final_mapping[i]] << ";" << std::endl;
             } else {
-                out_code << "default:" << std::endl;
-                out_code << "state = " << trap << ";" << std::endl;
-                out_code << "break;" << std::endl;
+                write_line(out_code, "default:", 5);
+                write_line(out_code, "state = ", 6, false)
+                    << trap << ";" << std::endl;
+                write_line(out_code, "break;", 6);
             }
-            out_code << "}" << std::endl;
-            out_code << "break;" << std::endl;
+            write_line(out_code, "}", 4);
+            write_line(out_code, "break;", 4);
         }
     }
-    out_code << "default: return token::ERROR; }}return token::ERROR;}";
+    write_line(out_code, "default:", 3);
+    write_line(out_code, "return token::ERROR;", 4);
+    write_line(out_code, "}", 2);
+    write_line(out_code, "}", 1);
+    write_line(out_code, "return token::ERROR;", 1);
+    write_line(out_code, "}", 0);
     out_code.close();
 }
 
 void generate_header(std::string dir, std::map<uint16_t, std::string> names) {
     std::ofstream out_header(dir);
-    out_header << "enum token {" << std::endl;
-    out_header << "    ERROR," << std::endl;
+    write_line(out_header, "enum token {", 0);
+    write_line(out_header, "ERROR,", 1);
     for (auto &pair : names) {
-        out_header << "    " << pair.second << "," << std::endl;
+        write_line(out_header, pair.second.c_str(), 1, false)
+            << "," << std::endl;
     }
-    out_header << "};";
+    write_line(out_header, "};", 0);
     out_header.close();
 }
