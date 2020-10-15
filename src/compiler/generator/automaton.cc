@@ -1,6 +1,7 @@
 #include "automaton.hh"
 
-std::ostream &print_set(std::ostream &stream, std::set<uint16_t> states) {
+std::ostream &print_set(std::ostream &stream,
+                        std::unordered_set<uint16_t> states) {
     stream << "{ ";
     for (uint16_t el : states) {
         stream << el << " ";
@@ -9,7 +10,7 @@ std::ostream &print_set(std::ostream &stream, std::set<uint16_t> states) {
     return stream;
 }
 
-automaton::automaton(uint16_t states, std::set<uint16_t> finals,
+automaton::automaton(uint16_t states, std::unordered_set<uint16_t> finals,
                      uint32_t alphabet, uint16_t initial)
     : states(states), initial(initial), alphabet(alphabet), finals(finals) {}
 
@@ -21,9 +22,12 @@ void automaton::connect(uint16_t start, uint16_t end, uint32_t input) {
 void automaton::_epsilon_closure_rec(std::set<uint16_t> &closure,
                                      uint16_t state) {
     closure.insert(state);
-    for (uint16_t state : this->get(state, 0)) {
-        if (!closure.contains(state)) {
-            automaton::_epsilon_closure_rec(closure, state);
+    uint64_t id = ((uint64_t)state) << 48;
+    for (auto &pair : this->transition) {
+        if ((pair.first & 0xffff0000ffffffff) == id) {
+            if (!closure.contains(pair.second)) {
+                automaton::_epsilon_closure_rec(closure, pair.second);
+            }
         }
     }
 }
@@ -38,8 +42,11 @@ std::set<uint16_t> automaton::input_closure(std::set<uint16_t> &state_e_closure,
                                             uint32_t input) {
     std::set<uint16_t> result;
     for (uint16_t state : state_e_closure) {
-        for (uint16_t state2 : this->get(state, input)) {
-            this->_epsilon_closure_rec(result, state2);
+        uint64_t id = ((uint64_t)state) << 48 | input;
+        for (auto &pair : this->transition) {
+            if ((pair.first & 0xffff0000ffffffff) == id) {
+                this->_epsilon_closure_rec(result, pair.second);
+            }
         }
     }
     return result;
@@ -48,17 +55,6 @@ std::set<uint16_t> automaton::input_closure(std::set<uint16_t> &state_e_closure,
 uint16_t automaton::get(uint16_t start, uint16_t end, uint32_t input) {
     uint64_t id = ((uint64_t)start) << 48 | ((uint64_t)end) << 32 | input;
     return this->transition[id];
-}
-
-std::set<uint16_t> automaton::get(uint16_t start, uint32_t input) {
-    std::set<uint16_t> states;
-    uint64_t id = ((uint64_t)start) << 48 | input;
-    for (auto &pair : this->transition) {
-        if ((pair.first & 0xffff0000ffffffff) == id) {
-            states.insert(pair.second);
-        }
-    }
-    return states;
 }
 
 std::ostream &operator<<(std::ostream &stream, const automaton &el) {
@@ -79,9 +75,10 @@ std::ostream &operator<<(std::ostream &stream, const automaton &el) {
     return stream;
 }
 
-void automaton::find_state_sets(std::vector<std::set<uint16_t>> &state_sets,
-                                std::unordered_map<uint64_t, uint16_t> &new_transition,
-                                std::set<uint16_t> origin) {
+void automaton::find_state_sets(
+    std::vector<std::set<uint16_t>> &state_sets,
+    std::unordered_map<uint64_t, uint16_t> &new_transition,
+    std::set<uint16_t> &origin) {
     if (std::find(state_sets.begin(), state_sets.end(), origin) ==
         state_sets.end()) {
         state_sets.push_back(origin);
@@ -133,7 +130,7 @@ std::pair<automaton, uint16_t> automaton::powerset(
     }
     automaton resulting(
         state_sets.size(),
-        std::set<uint16_t>(new_finals.begin(), new_finals.end()),
+        std::unordered_set<uint16_t>(new_finals.begin(), new_finals.end()),
         this->alphabet,
         std::find(state_sets.begin(), state_sets.end(), initial_closure) -
             state_sets.begin());

@@ -56,13 +56,13 @@ dfa_meta create_full_dfa(std::vector<rule> rules) {
     }
 
     std::unordered_map<uint16_t, std::string> finals;
-    automaton machine(0, std::set<uint16_t>{}, 0, 0);
+    automaton machine(0, std::unordered_set<uint16_t>{}, 0, 0);
     uint16_t state_count = 0;
     autopart part =
         match->connect_machine(machine, alphabet, names, finals, &state_count);
     machine.states = state_count;
     machine.alphabet = alphabet.size();
-    std::set<uint16_t> actual_finals;
+    std::unordered_set<uint16_t> actual_finals;
     for (auto &fin : finals) {
         actual_finals.insert(fin.first);
     }
@@ -109,7 +109,14 @@ void generate_cpp(std::string dir, automaton machine, uint16_t trap,
                 char_range range = alphabet[a - 1];
                 chr_t r_start = range >> 32;
                 chr_t r_end = range - 1;
-                uint16_t next_state = *machine.get(i, a).begin();
+                uint16_t next_state;
+                uint64_t id = ((uint64_t)i) << 48 | a;
+                for (auto &pair : machine.transition) {
+                    if ((pair.first & 0xffff0000ffffffff) == id) {
+                        next_state = pair.second;
+                        break;
+                    }
+                }
                 if (!is_final || next_state != trap) {
                     write_line(out_code, "case ", 5, false);
                     if (r_start != r_end) {
@@ -153,7 +160,8 @@ void generate_cpp(std::string dir, automaton machine, uint16_t trap,
     out_code.close();
 }
 
-void generate_header(std::string dir, std::unordered_map<uint16_t, std::string> names) {
+void generate_header(std::string dir,
+                     std::unordered_map<uint16_t, std::string> names) {
     std::ofstream out_header(dir);
     write_line(out_header, "enum token {", 0);
     write_line(out_header, "ERROR,", 1);

@@ -101,7 +101,7 @@ autopart ast_set::connect_machine(automaton &machine,
         finals[end_state] = a->second;
     }
 
-    std::set<uint32_t> set_alphabet;
+    std::unordered_set<uint32_t> set_alphabet;
     for (char_range range : this->ranges) {
         chr_t begin = range >> 32;
         chr_t end = range;
