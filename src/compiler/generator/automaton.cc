@@ -80,7 +80,7 @@ std::ostream &operator<<(std::ostream &stream, const automaton &el) {
 }
 
 void automaton::find_state_sets(std::vector<std::set<uint16_t>> &state_sets,
-                                std::map<uint64_t, uint16_t> &new_transition,
+                                std::unordered_map<uint64_t, uint16_t> &new_transition,
                                 std::set<uint16_t> origin) {
     if (std::find(state_sets.begin(), state_sets.end(), origin) ==
         state_sets.end()) {
@@ -103,10 +103,10 @@ void automaton::find_state_sets(std::vector<std::set<uint16_t>> &state_sets,
 }
 
 std::pair<automaton, uint16_t> automaton::powerset(
-    std::map<uint16_t, uint16_t> &final_mapping,
-    const std::map<uint16_t, std::string> &names) {
+    std::unordered_map<uint16_t, uint16_t> &final_mapping,
+    const std::unordered_map<uint16_t, std::string> &names) {
     std::vector<std::set<uint16_t>> state_sets;
-    std::map<uint64_t, uint16_t> new_transition;
+    std::unordered_map<uint64_t, uint16_t> new_transition;
     auto initial_closure = this->epsilon_closure(this->initial);
     this->find_state_sets(state_sets, new_transition, initial_closure);
     std::vector<uint16_t> new_finals;

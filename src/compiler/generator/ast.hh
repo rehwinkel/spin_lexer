@@ -26,8 +26,8 @@ class ast {
     virtual ~ast();
     virtual autopart connect_machine(automaton &machine,
                                      std::vector<char_range> &alphabet,
-                                     std::map<size_t, std::string> &names,
-                                     std::map<uint16_t, std::string> &finals,
+                                     std::unordered_map<size_t, std::string> &names,
+                                     std::unordered_map<uint16_t, std::string> &finals,
                                      uint16_t *state_count) = 0;
     virtual void construct_alphabet(std::vector<chr_t> &alphabet) = 0;
     virtual std::ostream &print(std::ostream &stream);
@@ -42,8 +42,8 @@ class ast_set : public ast {
     ast_set(std::vector<char_range>, bool negate);
     virtual autopart connect_machine(automaton &machine,
                                      std::vector<char_range> &alphabet,
-                                     std::map<size_t, std::string> &names,
-                                     std::map<uint16_t, std::string> &finals,
+                                     std::unordered_map<size_t, std::string> &names,
+                                     std::unordered_map<uint16_t, std::string> &finals,
                                      uint16_t *state_count);
     virtual void construct_alphabet(std::vector<chr_t> &alphabet);
     virtual ~ast_set();
@@ -57,8 +57,8 @@ class ast_cat : public ast {
     ast_cat(std::vector<std::unique_ptr<ast>> children);
     virtual autopart connect_machine(automaton &machine,
                                      std::vector<char_range> &alphabet,
-                                     std::map<size_t, std::string> &names,
-                                     std::map<uint16_t, std::string> &finals,
+                                     std::unordered_map<size_t, std::string> &names,
+                                     std::unordered_map<uint16_t, std::string> &finals,
                                      uint16_t *state_count);
     virtual void construct_alphabet(std::vector<chr_t> &alphabet);
     virtual ~ast_cat();
@@ -72,8 +72,8 @@ class ast_alt : public ast {
     ast_alt(std::vector<std::unique_ptr<ast>> children);
     virtual autopart connect_machine(automaton &machine,
                                      std::vector<char_range> &alphabet,
-                                     std::map<size_t, std::string> &names,
-                                     std::map<uint16_t, std::string> &finals,
+                                     std::unordered_map<size_t, std::string> &names,
+                                     std::unordered_map<uint16_t, std::string> &finals,
                                      uint16_t *state_count);
     virtual void construct_alphabet(std::vector<chr_t> &alphabet);
     virtual ~ast_alt();
@@ -88,8 +88,8 @@ class ast_rep : public ast {
     ast_rep(std::unique_ptr<ast> child, bool accept_empty);
     virtual autopart connect_machine(automaton &machine,
                                      std::vector<char_range> &alphabet,
-                                     std::map<size_t, std::string> &names,
-                                     std::map<uint16_t, std::string> &finals,
+                                     std::unordered_map<size_t, std::string> &names,
+                                     std::unordered_map<uint16_t, std::string> &finals,
                                      uint16_t *state_count);
     virtual void construct_alphabet(std::vector<chr_t> &alphabet);
     virtual ~ast_rep();

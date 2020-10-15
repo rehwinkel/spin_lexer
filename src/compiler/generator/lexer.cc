@@ -28,7 +28,7 @@ int main(int argc, char const *argv[]) {
 }
 
 dfa_meta create_full_dfa(std::vector<rule> rules) {
-    std::map<size_t, std::string> names;
+    std::unordered_map<size_t, std::string> names;
     for (rule &r : rules) {
         names[r.match->id()] = r.name;
     }
@@ -55,7 +55,7 @@ dfa_meta create_full_dfa(std::vector<rule> rules) {
         }
     }
 
-    std::map<uint16_t, std::string> finals;
+    std::unordered_map<uint16_t, std::string> finals;
     automaton machine(0, std::set<uint16_t>{}, 0, 0);
     uint16_t state_count = 0;
     autopart part =
@@ -67,7 +67,7 @@ dfa_meta create_full_dfa(std::vector<rule> rules) {
         actual_finals.insert(fin.first);
     }
     machine.finals = actual_finals;
-    std::map<uint16_t, uint16_t> final_mapping;
+    std::unordered_map<uint16_t, uint16_t> final_mapping;
     // std::cout << "nfa: " << machine << std::endl;
     auto [dfa, dead] = machine.powerset(final_mapping, finals);
     // std::cout << "dfa: " << dfa << std::endl;
@@ -87,8 +87,8 @@ inline std::ostream &write_line(std::ostream &stream, const char *content,
 }
 
 void generate_cpp(std::string dir, automaton machine, uint16_t trap,
-                  std::map<uint16_t, std::string> names,
-                  std::map<uint16_t, uint16_t> final_mapping,
+                  std::unordered_map<uint16_t, std::string> names,
+                  std::unordered_map<uint16_t, uint16_t> final_mapping,
                   std::vector<char_range> alphabet) {
     std::ofstream out_code(dir);
     write_line(out_code, "#include <lexer.hh>", 0);
@@ -153,7 +153,7 @@ void generate_cpp(std::string dir, automaton machine, uint16_t trap,
     out_code.close();
 }
 
-void generate_header(std::string dir, std::map<uint16_t, std::string> names) {
+void generate_header(std::string dir, std::unordered_map<uint16_t, std::string> names) {
     std::ofstream out_header(dir);
     write_line(out_header, "enum token {", 0);
     write_line(out_header, "ERROR,", 1);

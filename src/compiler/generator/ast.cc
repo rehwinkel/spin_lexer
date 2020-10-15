@@ -89,8 +89,8 @@ void connect_ranges(chr_t begin, chr_t end, bool negate, uint16_t start_state,
 
 autopart ast_set::connect_machine(automaton &machine,
                                   std::vector<char_range> &alphabet,
-                                  std::map<size_t, std::string> &names,
-                                  std::map<uint16_t, std::string> &finals,
+                                  std::unordered_map<size_t, std::string> &names,
+                                  std::unordered_map<uint16_t, std::string> &finals,
                                   uint16_t *state_count) {
     uint16_t start_state = *state_count;
     *state_count += 1;
@@ -135,8 +135,8 @@ autopart ast_set::connect_machine(automaton &machine,
 
 autopart ast_cat::connect_machine(automaton &machine,
                                   std::vector<char_range> &alphabet,
-                                  std::map<size_t, std::string> &names,
-                                  std::map<uint16_t, std::string> &finals,
+                                  std::unordered_map<size_t, std::string> &names,
+                                  std::unordered_map<uint16_t, std::string> &finals,
                                   uint16_t *state_count) {
     if (this->children.size() > 1) {
         std::vector<autopart> parts;
@@ -163,8 +163,8 @@ autopart ast_cat::connect_machine(automaton &machine,
 
 autopart ast_alt::connect_machine(automaton &machine,
                                   std::vector<char_range> &alphabet,
-                                  std::map<size_t, std::string> &names,
-                                  std::map<uint16_t, std::string> &finals,
+                                  std::unordered_map<size_t, std::string> &names,
+                                  std::unordered_map<uint16_t, std::string> &finals,
                                   uint16_t *state_count) {
     uint16_t start_state = *state_count;
     *state_count += 1;
@@ -189,8 +189,8 @@ autopart ast_alt::connect_machine(automaton &machine,
 
 autopart ast_rep::connect_machine(automaton &machine,
                                   std::vector<char_range> &alphabet,
-                                  std::map<size_t, std::string> &names,
-                                  std::map<uint16_t, std::string> &finals,
+                                  std::unordered_map<size_t, std::string> &names,
+                                  std::unordered_map<uint16_t, std::string> &finals,
                                   uint16_t *state_count) {
     uint16_t start_state = *state_count;
     *state_count += 1;
