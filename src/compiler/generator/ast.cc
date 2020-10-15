@@ -1,9 +1,5 @@
 #include "ast.hh"
 
-char_range make_char_range(chr_t start, chr_t end) {
-    return ((uint64_t)start << 32) | end;
-}
-
 ast::ast() : index(ast_counter++) {}
 
 ast::~ast() {}
@@ -16,7 +12,7 @@ std::ostream &ast::print(std::ostream &stream) {
 }
 
 ast_set::ast_set(chr_t start, chr_t end, bool negate)
-    : ranges{make_char_range(start, end)}, negate(negate) {}
+    : ranges{CHAR_RANGE(start, end)}, negate(negate) {}
 
 ast_set::ast_set(std::vector<char_range> ranges, bool negate)
     : ranges(std::move(ranges)), negate(negate) {}

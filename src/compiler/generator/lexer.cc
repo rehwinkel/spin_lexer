@@ -49,7 +49,7 @@ dfa_meta create_full_dfa(std::vector<rule> rules) {
             current = p;
         } else {
             if (current != p) {
-                alphabet.push_back(make_char_range(current, p));
+                alphabet.push_back(CHAR_RANGE(current, p));
                 current = p;
             }
         }

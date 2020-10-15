@@ -1,3 +1,4 @@
-IDENTIFIER [a-zA-Z_][a-zA-Z0-9_]*
-SPACE [ \n\r\t]+
-FUN fun
+IDENTIFIER (\L|_)(\L|[0-9_])*
+SPACE [ \t\n\r]+
+KW_FUN fun
+KW_VOID void

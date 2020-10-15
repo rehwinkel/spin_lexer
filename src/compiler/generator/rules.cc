@@ -70,6 +70,18 @@ std::unique_ptr<ast> parse_sequence(std::string &str, size_t *pos) {
                 break;
             }
             default:
+                if (str[*pos] == '\\') {
+                    if (str[*pos + 1] == 'L') {
+                        *pos += 2;
+                        sequence.emplace_back(std::make_unique<ast_set>(
+                            std::vector<char_range>(
+                                unicode_letters,
+                                unicode_letters + sizeof(unicode_letters) /
+                                                      sizeof(char_range)),
+                            false));
+                        break;
+                    }
+                }
                 chr_t ch = read_char(str, pos);
                 sequence.emplace_back(
                     std::make_unique<ast_set>(ch, ch + 1, false));
@@ -108,7 +120,7 @@ char_range parse_range(std::string &str, size_t *pos) {
         *pos += 1;
         end = read_char(str, pos) + 1;
     }
-    char_range result = make_char_range(start, end);
+    char_range result = CHAR_RANGE(start, end);
     return result;
 }
 

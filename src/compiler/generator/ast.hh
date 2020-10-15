@@ -8,7 +8,7 @@
 typedef uint32_t chr_t;
 typedef uint64_t char_range;
 
-char_range make_char_range(chr_t start, chr_t end);
+#define CHAR_RANGE(start, end) (((uint64_t)start << 32) | end)
 
 struct autopart {
     uint16_t start;
