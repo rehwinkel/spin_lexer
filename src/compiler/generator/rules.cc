@@ -102,8 +102,8 @@ std::unique_ptr<ast> parse_set(std::string &str, size_t *pos) {
 }
 
 char_range parse_range(std::string &str, size_t *pos) {
-    char start = read_char(str, pos);
-    char end = start + 1;
+    chr_t start = read_char(str, pos);
+    chr_t end = start + 1;
     if (str[*pos] == '-') {
         *pos += 1;
         end = read_char(str, pos) + 1;
@@ -145,6 +145,12 @@ chr_t read_char(std::string &str, size_t *pos) {
                 *pos += 1;
                 chr_t ch = std::stoul(str.substr(*pos, 4), nullptr, 16);
                 *pos += 4;
+                return ch;
+            }
+            case 'U': {
+                *pos += 1;
+                chr_t ch = std::stoul(str.substr(*pos, 8), nullptr, 16);
+                *pos += 8;
                 return ch;
             }
             default:
