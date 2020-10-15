@@ -1,3 +1,1 @@
-fun main(argc: int, argv: char**) int {
-    return 0;
-}
+fun1 fan1 fun

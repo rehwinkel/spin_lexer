@@ -154,7 +154,13 @@ stream::stream(std::string in_string) : m_data(in_string), m_position(0) {}
 stream::stream(string in_utf32_string)
     : m_data(in_utf32_string), m_position(0) {}
 
-chr_t stream::get() { return this->m_data[this->m_position++]; }
+chr_t stream::get() {
+    size_t p = this->m_position++;
+    if (p >= this->m_data.len()) {
+        return -1;
+    }
+    return this->m_data[p];
+}
 
 size_t stream::pos() { return this->m_position; }
 

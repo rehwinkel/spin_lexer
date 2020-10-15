@@ -8,6 +8,8 @@
 typedef uint32_t chr_t;
 typedef uint64_t char_range;
 
+char_range make_char_range(chr_t start, chr_t end);
+
 struct autopart {
     uint16_t start;
     uint16_t end;
@@ -31,39 +33,20 @@ class ast {
     virtual std::ostream &print(std::ostream &stream);
 };
 
-class ast_char : public ast {
-    chr_t ch;
+class ast_set : public ast {
+    std::vector<char_range> ranges;
+    bool negate;
 
    public:
-    ast_char(chr_t ch);
+    ast_set(chr_t start, chr_t end, bool negate);
+    ast_set(std::vector<char_range>, bool negate);
     virtual autopart connect_machine(automaton &machine,
                                      std::vector<char_range> &alphabet,
                                      std::map<size_t, std::string> &names,
                                      std::map<uint16_t, std::string> &finals,
                                      uint16_t *state_count);
     virtual void construct_alphabet(std::vector<chr_t> &alphabet);
-    virtual ~ast_char();
-    virtual std::ostream &print(std::ostream &stream);
-};
-
-enum regex_class {
-    WORD,
-    DIGIT,
-    SPACE,
-};
-
-class ast_class : public ast {
-    regex_class cls;
-
-   public:
-    ast_class(regex_class cls);
-    virtual autopart connect_machine(automaton &machine,
-                                     std::vector<char_range> &alphabet,
-                                     std::map<size_t, std::string> &names,
-                                     std::map<uint16_t, std::string> &finals,
-                                     uint16_t *state_count);
-    virtual void construct_alphabet(std::vector<chr_t> &alphabet);
-    virtual ~ast_class();
+    virtual ~ast_set();
     virtual std::ostream &print(std::ostream &stream);
 };
 

@@ -13,10 +13,10 @@ int main(int argc, char const *argv[]) {
     while (1) {
         token t = my_lexer.next();
         auto s = my_lexer.tk_str();
-        std::cout << t << ": '" << s << "'" << std::endl;
         if (t == token::ERROR) {
             break;
         }
+        std::cout << t << ": '" << s << "'" << std::endl;
     }
     return 0;
 }

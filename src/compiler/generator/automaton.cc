@@ -103,7 +103,8 @@ void automaton::find_state_sets(std::vector<std::set<uint16_t>> &state_sets,
 }
 
 std::pair<automaton, uint16_t> automaton::powerset(
-    std::map<uint16_t, uint16_t> &final_mapping) {
+    std::map<uint16_t, uint16_t> &final_mapping,
+    const std::map<uint16_t, std::string> &names) {
     std::vector<std::set<uint16_t>> state_sets;
     std::map<uint64_t, uint16_t> new_transition;
     auto initial_closure = this->epsilon_closure(this->initial);
@@ -120,7 +121,13 @@ std::pair<automaton, uint16_t> automaton::powerset(
                 state_sets.begin();
             new_finals.push_back(state);
             for (uint16_t orig_final : tmp_finals_inters) {
-                final_mapping[state] = orig_final;
+                auto &mapping = final_mapping[state];
+                if (mapping != 0) {
+                    std::cout << "Overwriting state result of "
+                              << names.at(mapping) << " with "
+                              << names.at(orig_final) << std::endl;
+                }
+                mapping = orig_final;
             }
         }
     }

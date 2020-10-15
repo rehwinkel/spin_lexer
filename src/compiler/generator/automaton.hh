@@ -26,6 +26,7 @@ class automaton {
     uint16_t get(uint16_t start, uint16_t end, uint32_t input);
     std::set<uint16_t> get(uint16_t start, uint32_t input);
     std::pair<automaton, uint16_t> powerset(
-        std::map<uint16_t, uint16_t> &final_mapping);
+        std::map<uint16_t, uint16_t> &final_mapping,
+        const std::map<uint16_t, std::string> &names);
     friend std::ostream &operator<<(std::ostream &stream, const automaton &el);
 };

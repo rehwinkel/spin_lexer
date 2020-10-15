@@ -1,5 +1,9 @@
 #include "ast.hh"
 
+char_range make_char_range(chr_t start, chr_t end) {
+    return ((uint64_t)start << 32) | end;
+}
+
 ast::ast() : index(ast_counter++) {}
 
 ast::~ast() {}
@@ -11,34 +15,29 @@ std::ostream &ast::print(std::ostream &stream) {
     return stream;
 }
 
-ast_char::ast_char(chr_t ch) : ch(ch) {}
+ast_set::ast_set(chr_t start, chr_t end, bool negate)
+    : ranges{make_char_range(start, end)}, negate(negate) {}
 
-ast_char::~ast_char() {}
+ast_set::ast_set(std::vector<char_range> ranges, bool negate)
+    : ranges(std::move(ranges)), negate(negate) {}
 
-std::ostream &ast_char::print(std::ostream &stream) {
-    stream << "Char(0x" << std::hex << this->ch << std::dec << ")";
-    return stream;
-}
+ast_set::~ast_set() {}
 
-ast_class::ast_class(regex_class cls) : cls(cls) {}
-
-ast_class::~ast_class() {}
-
-std::ostream &ast_class::print(std::ostream &stream) {
-    switch (this->cls) {
-        case WORD:
-            stream << "WORD";
-            break;
-        case DIGIT:
-            stream << "DIGIT";
-            break;
-        case SPACE:
-            stream << "SPACE";
-            break;
-
-        default:
-            break;
+std::ostream &ast_set::print(std::ostream &stream) {
+    if (this->negate) {
+        stream << "Not";
     }
+    stream << "Set(" << std::hex;
+    for (size_t i = 0; i < this->ranges.size(); i++) {
+        chr_t start = this->ranges[i] >> 32;
+        chr_t end = this->ranges[i];
+        stream << "0x" << start << "-0x" << end;
+        if (i + 1 < this->ranges.size()) {
+            stream << ", ";
+        }
+    }
+    stream << ")";
+    stream << std::dec;
     return stream;
 }
 
@@ -88,55 +87,15 @@ std::ostream &ast_rep::print(std::ostream &stream) {
     return stream;
 }
 
-char_range make_char_range(chr_t start, chr_t end) {
-    return ((uint64_t)start << 32) | end;
-}
+void connect_ranges(chr_t begin, chr_t end, bool negate, uint16_t start_state,
+                    uint16_t end_state, automaton &machine,
+                    std::vector<char_range> &alphabet) {}
 
-void connect_range(chr_t begin, chr_t end, uint16_t start_state,
-                   uint16_t end_state, automaton &machine,
-                   std::vector<char_range> &alphabet) {
-    size_t start_index = std::find_if(alphabet.begin(), alphabet.end(),
-                                      [&begin](const char_range &arg) {
-                                          return begin == arg >> 32;
-                                      }) -
-                         alphabet.begin();
-    size_t end_index = std::find_if(alphabet.begin(), alphabet.end(),
-                                    [&end](const char_range &arg) {
-                                        return end == (chr_t)arg;
-                                    }) -
-                       alphabet.begin();
-    for (size_t i = start_index; i < end_index + 1; i++) {
-        machine.connect(start_state, end_state, i + 1);
-    }
-}
-
-void connect_char(chr_t ch, uint16_t start_state, uint16_t end_state,
-                  automaton &machine, std::vector<char_range> &alphabet) {
-    connect_range(ch, ch + 1, start_state, end_state, machine, alphabet);
-}
-
-autopart ast_char::connect_machine(automaton &machine,
-                                   std::vector<char_range> &alphabet,
-                                   std::map<size_t, std::string> &names,
-                                   std::map<uint16_t, std::string> &finals,
-                                   uint16_t *state_count) {
-    uint16_t start_state = *state_count;
-    *state_count += 1;
-    uint16_t end_state = *state_count;
-    *state_count += 1;
-    auto a = names.find(this->id());
-    if (a != names.end()) {
-        finals[end_state] = a->second;
-    }
-    connect_char(this->ch, start_state, end_state, machine, alphabet);
-    return {start_state, end_state};
-}
-
-autopart ast_class::connect_machine(automaton &machine,
-                                    std::vector<char_range> &alphabet,
-                                    std::map<size_t, std::string> &names,
-                                    std::map<uint16_t, std::string> &finals,
-                                    uint16_t *state_count) {
+autopart ast_set::connect_machine(automaton &machine,
+                                  std::vector<char_range> &alphabet,
+                                  std::map<size_t, std::string> &names,
+                                  std::map<uint16_t, std::string> &finals,
+                                  uint16_t *state_count) {
     uint16_t start_state = *state_count;
     *state_count += 1;
     uint16_t end_state = *state_count;
@@ -146,24 +105,34 @@ autopart ast_class::connect_machine(automaton &machine,
         finals[end_state] = a->second;
     }
 
-    switch (this->cls) {
-        case WORD:
-            connect_range('a', 'z' + 1, start_state, end_state, machine,
-                          alphabet);
-            connect_range('A', 'Z' + 1, start_state, end_state, machine,
-                          alphabet);
-            break;
-        case DIGIT:
-            connect_range('0', '9' + 1, start_state, end_state, machine,
-                          alphabet);
-            break;
-        case SPACE:
-            connect_char(' ', start_state, end_state, machine, alphabet);
-            connect_char('\t', start_state, end_state, machine, alphabet);
-            connect_char('\n', start_state, end_state, machine, alphabet);
-            connect_char('\f', start_state, end_state, machine, alphabet);
-            connect_char('\r', start_state, end_state, machine, alphabet);
-            break;
+    std::set<uint32_t> set_alphabet;
+    for (char_range range : this->ranges) {
+        chr_t begin = range >> 32;
+        chr_t end = range;
+        size_t start_index = std::find_if(alphabet.begin(), alphabet.end(),
+                                          [&begin](const char_range &arg) {
+                                              return begin == arg >> 32;
+                                          }) -
+                             alphabet.begin();
+        size_t end_index = std::find_if(alphabet.begin(), alphabet.end(),
+                                        [&end](const char_range &arg) {
+                                            return end == (chr_t)arg;
+                                        }) -
+                           alphabet.begin();
+        for (size_t i = start_index; i < end_index + 1; i++) {
+            set_alphabet.insert(i + 1);
+        }
+    }
+    if (negate) {
+        for (size_t i = 1; i < alphabet.size() + 1; i++) {
+            if (!set_alphabet.contains(i)) {
+                machine.connect(start_state, end_state, i);
+            }
+        }
+    } else {
+        for (uint32_t el : set_alphabet) {
+            machine.connect(start_state, end_state, el);
+        }
     }
     return {start_state, end_state};
 }
@@ -246,35 +215,10 @@ autopart ast_rep::connect_machine(automaton &machine,
     return {start_state, end_state};
 }
 
-void ast_char::construct_alphabet(std::vector<chr_t> &alphabet) {
-    alphabet.push_back(this->ch);
-    alphabet.push_back(this->ch + 1);
-}
-
-void ast_class::construct_alphabet(std::vector<chr_t> &alphabet) {
-    switch (this->cls) {
-        case WORD:
-            alphabet.push_back('a');
-            alphabet.push_back('z' + 1);
-            alphabet.push_back('A');
-            alphabet.push_back('Z' + 1);
-            break;
-        case DIGIT:
-            alphabet.push_back('0');
-            alphabet.push_back('9' + 1);
-            break;
-        case SPACE:
-            alphabet.push_back(' ');
-            alphabet.push_back(' ' + 1);
-            alphabet.push_back('\t');
-            alphabet.push_back('\t' + 1);
-            alphabet.push_back('\n');
-            alphabet.push_back('\n' + 1);
-            alphabet.push_back('\f');
-            alphabet.push_back('\f' + 1);
-            alphabet.push_back('\r');
-            alphabet.push_back('\r' + 1);
-            break;
+void ast_set::construct_alphabet(std::vector<chr_t> &alphabet) {
+    for (char_range range : this->ranges) {
+        alphabet.push_back(range >> 32);
+        alphabet.push_back(range);
     }
 }
 

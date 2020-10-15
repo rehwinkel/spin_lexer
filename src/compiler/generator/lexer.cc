@@ -13,6 +13,10 @@ int main(int argc, char const *argv[]) {
 
     std::ifstream in_rules(rules_dir);
     auto rules = read_rules(in_rules);
+    for (const rule &r : rules) {
+        std::cout << r.name << ": ";
+        r.match->print(std::cout) << std::endl;
+    }
     dfa_meta dfa = create_full_dfa(std::move(rules));
     // std::cout << dfa.machine << std::endl;
     // std::cout << "trap: " << dfa.trap << std::endl;
@@ -35,7 +39,9 @@ dfa_meta create_full_dfa(std::vector<rule> rules) {
     auto match = std::make_unique<ast_alt>(std::move(match_seq));
     std::vector<char_range> alphabet;
     std::vector<chr_t> pre_alphabet;
+    pre_alphabet.push_back(0);
     match->construct_alphabet(pre_alphabet);
+    pre_alphabet.push_back(0x10FFFF + 2);
     std::sort(pre_alphabet.begin(), pre_alphabet.end());
     chr_t current = -1;
     for (chr_t p : pre_alphabet) {
@@ -62,8 +68,9 @@ dfa_meta create_full_dfa(std::vector<rule> rules) {
     }
     machine.finals = actual_finals;
     std::map<uint16_t, uint16_t> final_mapping;
-    // std::cout << machine << std::endl;
-    auto [dfa, dead] = machine.powerset(final_mapping);
+    // std::cout << "nfa: " << machine << std::endl;
+    auto [dfa, dead] = machine.powerset(final_mapping, finals);
+    // std::cout << "dfa: " << dfa << std::endl;
     return {dfa, dead, finals, final_mapping, alphabet};
 }
 
@@ -126,6 +133,8 @@ void generate_cpp(std::string dir, automaton machine, uint16_t trap,
                 write_line(out_code, "return token::", 6, false)
                     << names[final_mapping[i]] << ";" << std::endl;
             } else {
+                write_line(out_code, "case 0xFFFFFFFF:", 5);
+                write_line(out_code, "return token::ERROR;", 6);
                 write_line(out_code, "default:", 5);
                 write_line(out_code, "state = ", 6, false)
                     << trap << ";" << std::endl;

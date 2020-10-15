@@ -6,157 +6,156 @@ std::vector<rule> read_rules(std::istream &stream) {
     std::vector<rule> rules;
     std::string line;
     while (std::getline(stream, line)) {
-        size_t space_pos = line.find(' ');
-        std::string name = line.substr(2, space_pos - 2);
-        std::string rule_str = line.substr(space_pos + 1);
-        if (line[1] != ':') {
-            throw std::runtime_error("failed to parse rules at line: '" + line +
-                                     "'");
-        }
-        if (line[0] == 'L') {
-            std::vector<std::unique_ptr<ast>> match_seq;
-            utf32::string utfstring(rule_str);
-            for (size_t i = 0; i < utfstring.len(); i++) {
-                chr_t ch = utfstring[i];
-                match_seq.emplace_back(std::make_unique<ast_char>(ch));
-            }
-            std::unique_ptr<ast> prev;
-            if (match_seq.size() == 1) {
-                prev = std::move(match_seq[0]);
-            } else {
-                prev = std::make_unique<ast_cat>(std::move(match_seq));
-            }
-            std::cout << name << ": ";
-            prev->print(std::cout);
-            std::cout << std::endl;
-            rules.emplace_back(rule{name, std::move(prev)});
-        } else if (line[0] == 'R') {
-            size_t pos = 0;
-            auto match = parse_regex_rule(rule_str, &pos);
-            std::cout << name << ": ";
-            match->print(std::cout);
-            std::cout << std::endl;
-            rules.emplace_back(rule{name, std::move(match)});
-        } else {
-            throw std::runtime_error(
-                "invalid rule type (must be either 'L' or 'R'): '" +
-                std::to_string(line[0]) + "'");
-        }
+        size_t pos = 0;
+        rule r = parse_rule(line, &pos);
+        rules.emplace_back(std::move(r));
     }
     return rules;
 }
 
-std::unique_ptr<ast> parse_repeat(std::string &str, size_t *pos,
-                                  bool accept_empty) {
+rule parse_rule(std::string &str, size_t *pos) {
+    while (!std::isspace(str[*pos])) *pos += 1;
+    std::string name = str.substr(0, *pos);
     *pos += 1;
-    if (str[*pos] != '(') {
-        throw std::runtime_error("expected '(' while parsing regex: " + str);
-    }
-    *pos += 1;
-    auto match =
-        std::make_unique<ast_rep>(parse_regex_rule(str, pos), accept_empty);
-    if (str[*pos] != ')') {
-        throw std::runtime_error("expected ')' while parsing regex: " + str);
-    }
-    *pos += 1;
-    return match;
+    return rule{name, parse_regex(str, pos)};
 }
 
-std::unique_ptr<ast> parse_alternative(std::string &str, size_t *pos) {
-    std::vector<std::unique_ptr<ast>> match_seq;
-    *pos += 1;
-    if (str[*pos] != '(') {
-        throw std::runtime_error("expected '(' while parsing regex: " + str);
+std::unique_ptr<ast> parse_regex(std::string &str, size_t *pos) {
+    std::vector<std::unique_ptr<ast>> alternatives;
+    alternatives.emplace_back(parse_sequence(str, pos));
+    while (*pos < str.size() && str[*pos] == '|') {
+        *pos += 1;
+        auto seq = parse_sequence(str, pos);
+        alternatives.emplace_back(std::move(seq));
     }
-    *pos += 1;
-    match_seq.emplace_back(parse_regex_rule(str, pos));
-    if (str[*pos] != ')') {
-        throw std::runtime_error("expected ')' while parsing regex: " + str);
+    if (alternatives.size() == 1) {
+        return std::move(alternatives[0]);
     }
-    *pos += 1;
-    if (str[*pos] != '(') {
-        throw std::runtime_error("expected '(' while parsing regex: " + str);
-    }
-    *pos += 1;
-    match_seq.emplace_back(parse_regex_rule(str, pos));
-    if (str[*pos] != ')') {
-        throw std::runtime_error("expected ')' while parsing regex: " + str);
-    }
-    *pos += 1;
-    return std::make_unique<ast_alt>(std::move(match_seq));
+    return std::make_unique<ast_alt>(std::move(alternatives));
 }
 
-std::unique_ptr<ast> parse_escape(std::string &str, size_t *pos) {
-    *pos += 1;
-    switch (str[*pos]) {
-        case 'w':
-            *pos += 1;
-            return std::make_unique<ast_class>(regex_class::WORD);
-        case 's':
-            *pos += 1;
-            return std::make_unique<ast_class>(regex_class::SPACE);
-        case 'd':
-            *pos += 1;
-            return std::make_unique<ast_class>(regex_class::DIGIT);
-        case '*':
-            *pos += 1;
-            return std::make_unique<ast_char>('*');
-        case '|':
-            *pos += 1;
-            return std::make_unique<ast_char>('|');
-        case '(':
-            *pos += 1;
-            return std::make_unique<ast_char>('(');
-        case ')':
-            *pos += 1;
-            return std::make_unique<ast_char>(')');
-        case 'U': {
-            *pos += 1;
-            chr_t code = std::stoi(str.substr(*pos, 6), 0, 16);
-            *pos += 6;
-            return std::make_unique<ast_char>(code);
-        }
-        case 'u': {
-            *pos += 1;
-            chr_t code = std::stoi(str.substr(*pos, 4), 0, 16);
-            *pos += 4;
-            return std::make_unique<ast_char>(code);
-        }
-        case 'n': {
-            *pos += 1;
-            return std::make_unique<ast_char>('\n');
-        }
-        default:
-            throw std::runtime_error("error while parsing regex: " + str);
-    }
-}
-
-std::unique_ptr<ast> parse_regex_rule(std::string &str, size_t *pos) {
-    std::vector<std::unique_ptr<ast>> match_seq;
+std::unique_ptr<ast> parse_sequence(std::string &str, size_t *pos) {
+    std::vector<std::unique_ptr<ast>> sequence;
+    char next;
     while (*pos < str.size()) {
-        switch (str[*pos]) {
-            case '\\':
-                match_seq.emplace_back(parse_escape(str, pos));
+        next = str[*pos];
+        switch (next) {
+            case '[':
+                *pos += 1;
+                sequence.emplace_back(parse_set(str, pos));
                 break;
-            case '*':
-                match_seq.emplace_back(parse_repeat(str, pos, true));
-                break;
-            case '+':
-                match_seq.emplace_back(parse_repeat(str, pos, false));
-                break;
-            case '|':
-                match_seq.emplace_back(parse_alternative(str, pos));
+            case '(':
+                *pos += 1;
+                sequence.emplace_back(parse_regex(str, pos));
                 break;
             case ')':
-                return std::make_unique<ast_cat>(std::move(match_seq));
-            default:
-                match_seq.emplace_back(std::make_unique<ast_char>(str[*pos]));
                 *pos += 1;
+                goto mainloop;
+            case '|':
+                goto mainloop;
+            case '*': {
+                *pos += 1;
+                auto rep =
+                    std::make_unique<ast_rep>(std::move(sequence.back()), true);
+                sequence.pop_back();
+                sequence.emplace_back(std::move(rep));
                 break;
+            }
+            case '+': {
+                *pos += 1;
+                auto rep = std::make_unique<ast_rep>(std::move(sequence.back()),
+                                                     false);
+                sequence.pop_back();
+                sequence.emplace_back(std::move(rep));
+                break;
+            }
+            default:
+                chr_t ch = read_char(str, pos);
+                sequence.emplace_back(
+                    std::make_unique<ast_set>(ch, ch + 1, false));
         }
     }
-    if (match_seq.size() == 1) {
-        return std::move(match_seq[0]);
+mainloop:
+    if (sequence.size() == 1) {
+        return std::move(sequence[0]);
+    } else {
+        return std::make_unique<ast_cat>(std::move(sequence));
     }
-    return std::make_unique<ast_cat>(std::move(match_seq));
+}
+
+std::unique_ptr<ast> parse_set(std::string &str, size_t *pos) {
+    std::vector<char_range> ranges;
+    bool negated = str[*pos] == '^';
+    if (negated) {
+        *pos += 1;
+    }
+    char next;
+    while (1) {
+        next = str[*pos];
+        if (next == ']') {
+            *pos += 1;
+            break;
+        }
+        ranges.emplace_back(parse_range(str, pos));
+    }
+    return std::make_unique<ast_set>(std::move(ranges), negated);
+}
+
+char_range parse_range(std::string &str, size_t *pos) {
+    char start = read_char(str, pos);
+    char end = start + 1;
+    if (str[*pos] == '-') {
+        *pos += 1;
+        end = read_char(str, pos) + 1;
+    }
+    char_range result = make_char_range(start, end);
+    return result;
+}
+
+chr_t read_char(std::string &str, size_t *pos) {
+    if (str[*pos] == '\\') {
+        *pos += 1;
+        char next = str[*pos];
+        switch (next) {
+            case '\\':
+                *pos += 1;
+                return '\\';
+            case 'n':
+                *pos += 1;
+                return '\n';
+            case 'r':
+                *pos += 1;
+                return '\r';
+            case 't':
+                *pos += 1;
+                return '\t';
+            case '+':
+                *pos += 1;
+                return '+';
+            case '*':
+                *pos += 1;
+                return '*';
+            case '[':
+                *pos += 1;
+                return '[';
+            case ']':
+                *pos += 1;
+                return ']';
+            case 'u': {
+                *pos += 1;
+                chr_t ch = std::stoul(str.substr(*pos, 4), nullptr, 16);
+                *pos += 4;
+                return ch;
+            }
+            default:
+                std::string msg("invalid escape: '\\");
+                msg.append(std::to_string((unsigned int)next));
+                msg.push_back('\'');
+                throw std::runtime_error(msg);
+        }
+    } else {
+        char c = str[*pos];
+        *pos += 1;
+        return c;
+    }
 }
