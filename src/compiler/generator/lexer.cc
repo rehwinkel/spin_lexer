@@ -91,19 +91,13 @@ void generate_cpp(std::string dir, automaton machine, uint16_t trap,
                   std::unordered_map<uint16_t, uint16_t> final_mapping,
                   std::vector<char_range> alphabet) {
     std::ofstream out_code(dir);
-    write_line(out_code, "#include <lexer.hh>", 0);
-    out_code << std::endl;
-    write_line(out_code, "token lexer::next() {", 0);
-    write_line(out_code, "uint16_t state = ", 1, false)
-        << machine.initial << ";" << std::endl;
-    write_line(out_code, "this->m_tk_start = this->stream.pos();", 1);
-    write_line(out_code, "while (1) {", 1);
-    write_line(out_code, "utf32::chr_t next = this->stream.get();", 2);
-    write_line(out_code, "switch (state) {", 2);
+    out_code << "#include <lexer.hh>" << std::endl
+             << "token lexer::next(){uint16_t s=" << machine.initial
+             << ";this->m_tk_start=this->stream.pos();while(1){utf32::chr_t n="
+                "this->stream.get();switch(s){";
     for (uint16_t i = 0; i < machine.states; i++) {
         if (i != trap) {
-            write_line(out_code, "case ", 3, false) << i << ":" << std::endl;
-            write_line(out_code, "switch (next) {", 4);
+            out_code << "case " << i << ":switch(n){";
             bool is_final = final_mapping.find(i) != final_mapping.end();
             for (size_t a = 1; a <= machine.alphabet; a++) {
                 char_range range = alphabet[a - 1];
@@ -118,57 +112,37 @@ void generate_cpp(std::string dir, automaton machine, uint16_t trap,
                     }
                 }
                 if (!is_final || next_state != trap) {
-                    write_line(out_code, "case ", 5, false);
+                    out_code << "case ";
                     if (r_start != r_end) {
-                        out_code << r_start << " ... " << r_end << ":"
-                                 << std::endl;
+                        out_code << r_start << " ... " << r_end << ":";
                     } else {
-                        out_code << r_end << ":" << std::endl;
+                        out_code << r_end << ":";
                     }
-                    write_line(out_code, "state = ", 6, false)
-                        << next_state << ";" << std::endl;
-                    write_line(out_code, "break;", 6);
+                    out_code << "s=" << next_state << ";break;";
                 }
             }
             if (is_final) {
-                write_line(out_code, "default:", 5);
-                write_line(out_code, "this->stream.back();", 6);
-                write_line(out_code,
-                           "this->m_tk_length = this->stream.pos() - "
-                           "this->m_tk_start;",
-                           6);
-                write_line(out_code, "return token::", 6, false)
-                    << names[final_mapping[i]] << ";" << std::endl;
+                out_code << "default:this->stream.back();this->m_tk_length="
+                            "this->stream.pos()-this->m_tk_start;return token::"
+                         << names[final_mapping[i]] << ";";
             } else {
-                write_line(out_code, "case 0xFFFFFFFF:", 5);
-                write_line(out_code, "return token::ERROR;", 6);
-                write_line(out_code, "default:", 5);
-                write_line(out_code, "state = ", 6, false)
-                    << trap << ";" << std::endl;
-                write_line(out_code, "break;", 6);
+                out_code << "case 0xFFFFFFFF:return token::ERROR;default:s="
+                         << trap << ";break;";
             }
-            write_line(out_code, "}", 4);
-            write_line(out_code, "break;", 4);
+            out_code << "}break;";
         }
     }
-    write_line(out_code, "default:", 3);
-    write_line(out_code, "return token::ERROR;", 4);
-    write_line(out_code, "}", 2);
-    write_line(out_code, "}", 1);
-    write_line(out_code, "return token::ERROR;", 1);
-    write_line(out_code, "}", 0);
+    out_code << "default:return token::ERROR;}}return token::ERROR;}";
     out_code.close();
 }
 
 void generate_header(std::string dir,
                      std::unordered_map<uint16_t, std::string> names) {
     std::ofstream out_header(dir);
-    write_line(out_header, "enum token {", 0);
-    write_line(out_header, "ERROR,", 1);
+    out_header << "enum token {" << std::endl << "    ERROR," << std::endl;
     for (auto &pair : names) {
-        write_line(out_header, pair.second.c_str(), 1, false)
-            << "," << std::endl;
+        out_header << "    " << pair.second.c_str() << "," << std::endl;
     }
-    write_line(out_header, "};", 0);
+    out_header << "};";
     out_header.close();
 }
