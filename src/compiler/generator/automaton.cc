@@ -1,8 +1,8 @@
 #include "automaton.hh"
 
-std::unordered_set<uint16_t> intersect_set(
-    std::unordered_set<uint16_t> &set_a, std::unordered_set<uint16_t> &set_b) {
-    std::unordered_set<uint16_t> output;
+std::set<uint16_t> intersect_set(std::unordered_set<uint16_t> &set_a,
+                                 std::unordered_set<uint16_t> &set_b) {
+    std::set<uint16_t> output;
     for (uint16_t el : set_a) {
         if (set_b.contains(el)) {
             output.insert(el);
@@ -109,7 +109,7 @@ std::pair<automaton, uint16_t> automaton::powerset(
     this->find_state_sets(state_sets, new_transition, initial_closure);
     std::vector<uint16_t> new_finals;
     for (std::unordered_set<uint16_t> &state_set : state_sets) {
-        std::unordered_set<uint16_t> tmp_finals_inters =
+        std::set<uint16_t> tmp_finals_inters =
             intersect_set(state_set, this->finals);
         if (tmp_finals_inters.size() > 0) {
             uint16_t state =

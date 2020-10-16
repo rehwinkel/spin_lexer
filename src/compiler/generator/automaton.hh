@@ -3,9 +3,10 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <set>
 
-std::unordered_set<uint16_t> intersect_set(std::unordered_set<uint16_t> &set_a,
-                                           std::unordered_set<uint16_t> &set_b);
+std::set<uint16_t> intersect_set(std::unordered_set<uint16_t> &set_a,
+                                 std::unordered_set<uint16_t> &set_b);
 
 class automaton {
     std::unordered_set<uint16_t> epsilon_closure(uint16_t state);
