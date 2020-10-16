@@ -1,21 +1,21 @@
-#include <set>
 #include <unordered_set>
 #include <unordered_map>
 #include <iostream>
 #include <vector>
 #include <algorithm>
 
-std::ostream &print_set(std::ostream &stream,
-                        std::unordered_set<uint16_t> states);
+std::unordered_set<uint16_t> intersect_set(std::unordered_set<uint16_t> &set_a,
+                                           std::unordered_set<uint16_t> &set_b);
 
 class automaton {
-    std::set<uint16_t> epsilon_closure(uint16_t state);
-    std::set<uint16_t> input_closure(std::set<uint16_t> &state_e_closure,
-                                     uint32_t input);
-    void _epsilon_closure_rec(std::set<uint16_t> &closure, uint16_t state);
-    void find_state_sets(std::vector<std::set<uint16_t>> &state_sets,
+    std::unordered_set<uint16_t> epsilon_closure(uint16_t state);
+    std::unordered_set<uint16_t> input_closure(
+        std::unordered_set<uint16_t> &state_e_closure, uint32_t input);
+    void _epsilon_closure_rec(std::unordered_set<uint16_t> &closure,
+                              uint16_t state);
+    void find_state_sets(std::vector<std::unordered_set<uint16_t>> &state_sets,
                          std::unordered_map<uint64_t, uint16_t> &new_transition,
-                         std::set<uint16_t> &origin);
+                         std::unordered_set<uint16_t> &origin);
 
    public:
     uint16_t states, initial;
